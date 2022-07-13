@@ -14,14 +14,15 @@ from pytorch_metric_learning import losses, distances, regularizers
 from pytorch_metric_learning.utils import loss_and_miner_utils as lmu
 from sklearn.metrics.cluster import adjusted_rand_score as ri
 
-from hpcs.utils.viz import plot_hyperbolic_eval
-from hpcs.utils.scores import eval_clustering, get_optimal_k
-from hpcs.distances import HyperbolicLCA, HyperbolicDistance
-from hpcs.nn.conv import DynamicEdgeConv
+from smutsia.utils.viz import plot_hyperbolic_eval
+from smutsia.utils.scores import eval_clustering, get_optimal_k
+from smutsia.nn.distances import HyperbolicLCA, HyperbolicDistance
+from smutsia.nn.distances.poincare import project
+from smutsia.nn.conv import DynamicEdgeConv
 
-from hpcs.optim import RAdam
+from smutsia.nn.optim import RAdam
 from . import TransformNet
-from . import MLP
+from .. import MLP
 
 
 class EulerFeatExtract(torch.nn.Module):
@@ -32,13 +33,13 @@ class EulerFeatExtract(torch.nn.Module):
         self.gamma = torch.nn.Parameter(torch.Tensor([init_gamma]), requires_grad=True)
 
         self.mlp1 = MLP([in_channels, hidden_features, hidden_features], negative_slope=negative_slope,
-                        dropout=dropout, bias=bias)
+                       dropout=dropout, bias=bias)
 
         self.mlp2 = MLP([in_channels, hidden_features, hidden_features], negative_slope=negative_slope, dropout=dropout,
                         bias=bias)
         self.linear = Seq(
-            Linear(in_features=hidden_features, out_features=1, bias=True),
-            BatchNorm1d(1)
+                Linear(in_features=hidden_features, out_features=1, bias=True),
+                BatchNorm1d(1)
         )
 
     def forward(self, x):
@@ -47,7 +48,7 @@ class EulerFeatExtract(torch.nn.Module):
         # return torch.cat([x1, x2], dim=1)
         x = self.linear(x)
         # x = (x - x.min()) / (x.max() - x.min())
-        return torch.cat([torch.cos(self.gamma * x), torch.sin(self.gamma * x)], dim=1)
+        return torch.cat([torch.cos(self.gamma*x), torch.sin(self.gamma*x)], dim=1)
 
 
 class FeatureExtraction(torch.nn.Module):
@@ -105,28 +106,28 @@ class SimilarityHypHC(pl.LightningModule):
     ----------
     nn: torch.nn.Module
         model used to do feature extraction
-
+        
     embedder: Union[torch.nn.Module, None]
         if not None, module used to embed features from initial space to Poincare's Disk
-
+    
     sim_distance: optional {'cosine', 'hyperbolic'}
         similarity distance to use to compute the triplet loss function in the features' space
-
+        
     temperature: float
         factor used in the HypHC loss
-
+        
     margin: float
         margin value used in the triplet loss
-
+         
     init_rescale: float
         scale value used to rescale leaf embeddings in the Poincare's Disk
-
+        
     max_scale: float
         max scale value to use to rescale leaf embeddings
-
+        
     lr: float
         learning rate
-
+        
     patience: int
         patience value for the scheduler
 
@@ -140,10 +141,9 @@ class SimilarityHypHC(pl.LightningModule):
         plot validation value every #plot_every epochs
 
     """
-
     def __init__(self, nn: torch.nn.Module, embedder: Union[torch.nn.Module, None],
                  sim_distance: str = 'cosine', temperature: float = 0.05, anneal: float = 0.5, anneal_step: int = 0,
-                 margin: float = 1.0, init_rescale: float = 1e-3, max_scale: float = 1. - 1e-3, lr: float = 1e-3,
+                 margin: float = 1.0, init_rescale: float = 1e-3, max_scale: float = 1.-1e-3, lr: float = 1e-3,
                  patience: int = 10, factor: float = 0.5, min_lr: float = 1e-4,
                  plot_every: int = -1):
         super(SimilarityHypHC, self).__init__()
@@ -168,10 +168,10 @@ class SimilarityHypHC(pl.LightningModule):
             # self.loss_triplet_sim = losses.TripletMarginLoss(distance=self.distace_sim, margin=self.margin,
             #                                                  embedding_regularizer=regularizers.LpRegularizer())
         else:
-            raise ValueError(
-                f"The option {sim_distance} is not available for sim_distance. The only available are ['cosine', 'euclidean', 'hyperbolic'].")
+            raise ValueError(f"The option {sim_distance} is not available for sim_distance. The only available are ['cosine', 'euclidean', 'hyperbolic'].")
 
         self.loss_triplet_sim = losses.TripletMarginLoss(distance=self.distace_sim, margin=self.margin)
+
 
         print("MARGIN", self.margin)
         # learning rate
@@ -297,7 +297,7 @@ class SimilarityHypHC(pl.LightningModule):
         # min_num_clusters = max(n_clusters - 1, 1)
         best_k = 0
         best_pred = None
-        for k in range(1, n_clusters + 5):
+        for k in range(1, n_clusters+5):
             # print(k)
             y_pred = fcluster(linkage_matrix, k, criterion='maxclust') - 1
             k_ri = ri(y, y_pred)
@@ -409,21 +409,21 @@ class SimilarityHypHC(pl.LightningModule):
         # ri_score = ri(data.y.detach().cpu().numpy(), y_pred)
 
         self.logger.experiment.add_scalar("Loss/Test", test_loss, batch_idx)
-        self.logger.experiment.add_scalar("RandScore/Test", best_ri, batch_idx)
+        self.logger.experiment.add_scalar("RandScore/Test", best_ri,  batch_idx)
         # self.logger.experiment.add_scalar("AccScore@k/Test", acc_score,  batch_idx)
-        self.logger.experiment.add_scalar("PurityScore@k/Test", pu_score, batch_idx)
-        self.logger.experiment.add_scalar("NMIScore@k/Test", nmi_score, batch_idx)
+        self.logger.experiment.add_scalar("PurityScore@k/Test", pu_score,  batch_idx)
+        self.logger.experiment.add_scalar("NMIScore@k/Test", nmi_score,  batch_idx)
         self.logger.experiment.add_scalar("RandScore@k/Test", ri_score, batch_idx)
 
         tag = batch_idx // 10
         step = batch_idx % 10
         self.logger.experiment.add_figure(f"Plots/Test:{tag}", figure=fig, global_step=step)
-        self.logger.log_metrics({'ari@k': ri_score, 'purity@k': pu_score, 'nmi@k': nmi_score,
+        self.logger.log_metrics({'ari@k': ri_score, 'purity@k':pu_score, 'nmi@k':nmi_score,
                                  'ari': best_ri, 'best_k': k}, step=batch_idx)
 
         return {'test_loss': test_loss, 'test_ri@k': torch.tensor(ri_score),
                 'test_pu@k': torch.tensor(pu_score), 'test_nmi@k': torch.tensor(nmi_score),
-                'test_ri': torch.tensor(best_ri), 'k': torch.tensor(k, dtype=torch.float)}
+                'test_ri': torch.tensor(best_ri) , 'k': torch.tensor(k, dtype=torch.float)}
 
     def test_epoch_end(self, outputs):
 
@@ -441,6 +441,7 @@ class SimilarityHypHC(pl.LightningModule):
         avg_best_k = torch.stack([x['k'] for x in outputs]).mean()
         std_best_k = torch.stack([x['k'] for x in outputs]).std()
 
+
         metrics = {'ari@k': avg_ri_k, 'ari@k-std': std_ri_k,
                    # 'acc@k': avg_acc_k, 'acc@k-std': std_acc_k,
                    'purity@k': avg_pu_k, 'purity@k-std': std_pu_k,
@@ -454,7 +455,7 @@ class SimilarityHypHC(pl.LightningModule):
                 'test_ri': avg_ri,
                 'ari@k': avg_ri_k, 'ari@k-std': std_ri_k,
                 # 'acc@k': avg_acc_k, 'acc@k-std': std_acc_k,
-                'purity@k': avg_pu_k, 'purity@k-std': std_pu_k,
+                'purity@k':avg_pu_k, 'purity@k-std': std_pu_k,
                 'nmi@k': avg_nmi_k, 'nmi@k-std': std_nmi_k}
 
 
@@ -463,7 +464,7 @@ class HyperbolicSeg(pl.LightningModule):
                  dropout=0.3, negative_slope=0.2,
                  sim_distance: str = 'cosine', t_per_anchor=100, label_ratio=0.3,
                  temperature: float = 0.05, margin: float = 1.0, init_rescale: float = 1e-3,
-                 max_scale: float = 1. - 1e-3, lr: float = 1e-3, patience: int = 10,
+                 max_scale: float = 1.-1e-3, lr: float = 1e-3, patience: int = 10,
                  factor: float = 0.5, min_lr: float = 1e-4, weight_decay=1e-4):
 
         super(HyperbolicSeg, self).__init__()
@@ -520,8 +521,8 @@ class HyperbolicSeg(pl.LightningModule):
             self.loss_triplet_sim = losses.TripletMarginLoss(distance=self.distace_sim, margin=self.margin,
                                                              embedding_regularizer=regularizers.LpRegularizer())
         else:
-            raise ValueError(
-                f"The option {sim_distance} is not available for sim_distance. The only available are ['cosine', 'euclidean'].")
+            raise ValueError(f"The option {sim_distance} is not available for sim_distance. The only available are ['cosine', 'euclidean'].")
+
 
         # parameters for optimizers
         self.lr = lr
@@ -533,6 +534,7 @@ class HyperbolicSeg(pl.LightningModule):
         # parameter to control manual optimization
         self.automatic_optimization = False
 
+
     def configure_optimizers(self):
 
         optim_adam = Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
@@ -542,8 +544,7 @@ class HyperbolicSeg(pl.LightningModule):
         optimizers = [optim_adam, optim_radam]
         schedulers = [
             {
-                'scheduler': lr_scheduler.ReduceLROnPlateau(optimizers[1], mode='min', factor=0.5, patience=10,
-                                                            min_lr=1e-4, verbose=True),
+                'scheduler': lr_scheduler.ReduceLROnPlateau(optimizers[1], mode='min', factor=0.5, patience=10, min_lr=1e-4, verbose=True),
                 'monitor': 'val_loss',
                 'interval': 'epoch',
                 'frequency': 1,
@@ -603,6 +604,7 @@ class HyperbolicSeg(pl.LightningModule):
 
         return loss_triplet_sim, loss_triplet_lca
 
+
     def forward(self, x, y, batch=None, labels=None):
 
         if self.transform:
@@ -612,7 +614,7 @@ class HyperbolicSeg(pl.LightningModule):
                 x = torch.matmul(x, tr[0])
             else:
                 batch_size = batch.max().item() + 1
-                x = torch.cat([torch.matmul(x[batch == i], tr[i]) for i in range(batch_size)])
+                x = torch.cat([torch.matmul(x[batch==i], tr[i]) for i in range(batch_size)])
 
         # feature extractor
         x1 = self.conv1(x, batch)
@@ -636,6 +638,7 @@ class HyperbolicSeg(pl.LightningModule):
 
             return F.log_softmax(out, dim=-1)
 
+
     def step(self, data, compute_hier_loss=False):
         if isinstance(data, list):
             data = Batch.from_data_list(data, follow_batch=[]).to(self.device)
@@ -649,7 +652,7 @@ class HyperbolicSeg(pl.LightningModule):
             for c in classes:
                 # picking at least one label per class
                 p = torch.zeros(x.size(0))
-                p[y == c] = 1
+                p[y==c] = 1
                 num_labels = max(int(p.sum() * self.label_ratio), 1)
                 idx = p.multinomial(num_samples=num_labels, replacement=False)
                 labels[idx] = True
@@ -703,6 +706,7 @@ class HyperbolicSeg(pl.LightningModule):
         opt_radam.zero_grad()
 
         # return {'loss': loss, 'loss_triplet': loss_triplet, 'loss_hyphc': loss_hyphc, 'acc': acc_score, 'iou': iou_score}
+
 
     def training_epoch_end(self, outputs):
         self.epoch_end(outputs)

@@ -2,4 +2,4 @@ __all__ = [
     'ToyDatasets'
 ]
 
-from toy_dataset import ToyDatasets
+from .toy_dataset import ToyDatasets

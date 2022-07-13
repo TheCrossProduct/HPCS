@@ -182,7 +182,7 @@ def generate_dataset(name: str, total_samples: int, max_points: int, noise: Unio
         lab_idx = get_label_idx(y, label_quantity=num_labels)
         x, y, lab_idx = torch.Tensor(x), torch.from_numpy(y), torch.from_numpy(lab_idx)
         labels = torch.zeros_like(y, dtype=torch.bool)
-        labels[lab_idx] = True
+        labels[lab_idx.long()] = True
         data.append(Data(x=x, y=y, labels=labels))
 
     return data
