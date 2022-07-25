@@ -2,7 +2,6 @@ import torch
 import torch.utils.data as data
 import numpy as np
 import os
-import sys
 import h5py
 import pickle
 
@@ -151,7 +150,7 @@ class PartNetSeg(data.Dataset):
 
 
 if __name__ == "__main__":
-    import data_utils as d_utils
+    from hpcs.data.PartNet import data_utils as d_utils
     from torchvision import transforms
 
     transforms = transforms.Compose(
