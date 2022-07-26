@@ -10,7 +10,8 @@ from torch.utils.data import DistributedSampler
 from torch_geometric import transforms as T
 from hpcs.nn.models._hyp_hc import SimilarityHypHC, FeatureExtraction, EulerFeatExtract
 from hpcs.nn.models._mlp import MLP
-from hpcs.data.shapenet import train_loader, valid_loader, test_loader
+from hpcs.nn.models._pointtransformer import PointTransformer
+from hpcs.data.shapenet import train_dataset, train_loader, valid_loader, test_loader
 
 
 if __name__ == "__main__":
@@ -26,7 +27,7 @@ if __name__ == "__main__":
     parser.add_argument('--max_noise', default=0.15, type=float, help='max value of noise to use')
     parser.add_argument('--cluster_std', default=0.1, type=float, help='std blobs')
     parser.add_argument('--num_blobs', default=3, type=int, help='number of blobs in blob/aniso/varied')
-    parser.add_argument('--model', default='dgcnn', type=str, help='model to use to extract features')
+    parser.add_argument('--model', default='pointtransformer', type=str, help='model to use to extract features')
     parser.add_argument('--embedder', help='if True add a an embedding model from the feature space to B2', action='store_true')
     parser.add_argument('--k', default=10, type=int, help='if model dgcnn, k is the number of neigh to take into account')
     parser.add_argument('--hidden', default=64, type=int, help='number of hidden features')
@@ -43,7 +44,7 @@ if __name__ == "__main__":
     parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
     parser.add_argument('--patience', default=50, type=int, help='patience value for early stopping')
     parser.add_argument('--plot', default=-1, type=int, help='interval in which we plot prediction on validation batch')
-    parser.add_argument('--gpu', default="0", type=str, help='use gpu')
+    parser.add_argument('--gpu', default="", type=str, help='use gpu')
     parser.add_argument('--distributed', help='if True run on a cluster machine', action='store_true')
     parser.add_argument('--num_workers', type=int, default=4)
 
@@ -125,6 +126,8 @@ if __name__ == "__main__":
                                dropout=dropout, negative_slope=negative_slope, cosine=cosine)
     elif model_name == 'euler':
         nn = EulerFeatExtract(in_channels=3, hidden_features=hidden, dropout=dropout, negative_slope=negative_slope)
+    elif model_name == 'pointtransformer':
+        nn = PointTransformer(in_channels=3, out_channels=train_dataset.num_classes, dim_model=[32, 64, 128, 256, 512], k=16)
     else:
         nn = MLP([3, hidden, hidden, hidden, hidden, out_features], dropout=dropout, negative_slope=negative_slope)
 

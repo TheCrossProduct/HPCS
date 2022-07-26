@@ -8,7 +8,8 @@ __all__ = [
     'TNet',
     'DGCNN',
     'SimilarityHypHC',
-    'UNet'
+    'UNet',
+    'PointTransformer'
 
 ]
 
@@ -17,3 +18,4 @@ from ._point_net import TransformNet, TNet
 from ._dgcnn import DGCNN
 from ._hyp_hc import SimilarityHypHC
 from ._unet import UNet
+from ._pointtransformer import PointTransformer

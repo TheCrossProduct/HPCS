@@ -50,7 +50,7 @@ class EulerFeatExtract(torch.nn.Module):
         return torch.cat([torch.cos(self.gamma * x), torch.sin(self.gamma * x)], dim=1)
 
 
-class FeatureExtraction(torch.nn.Module):
+class DGCNN(torch.nn.Module):
     def __init__(self, in_channels: int, out_features: int, hidden_features: int, k: int, transformer: bool = False,
                  negative_slope: float = 0.2, dropout=0.0, cosine=False):
         super(FeatureExtraction, self).__init__()
