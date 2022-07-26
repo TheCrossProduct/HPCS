@@ -22,6 +22,6 @@ train_dataset = ShapeNet(path, category, split='train', transform=transform, pre
 valid_dataset = ShapeNet(path, category, split='val', transform=transform, pre_transform=pre_transform)
 test_dataset = ShapeNet(path, category, split='test', pre_transform=pre_transform)
 
-train_loader = DataLoader(train_dataset, batch_size=10, shuffle=True, num_workers=6)
-valid_loader = DataLoader(valid_dataset, batch_size=10, shuffle=False, num_workers=6)
-test_loader = DataLoader(test_dataset, batch_size=10, shuffle=False, num_workers=6)
+train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=6)
+valid_loader = DataLoader(valid_dataset, batch_size=1, shuffle=False, num_workers=6)
+test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=6)
