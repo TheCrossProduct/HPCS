@@ -27,7 +27,7 @@ if __name__ == "__main__":
     parser.add_argument('--max_noise', default=0.15, type=float, help='max value of noise to use')
     parser.add_argument('--cluster_std', default=0.1, type=float, help='std blobs')
     parser.add_argument('--num_blobs', default=3, type=int, help='number of blobs in blob/aniso/varied')
-    parser.add_argument('--model', default='pointtransformer', type=str, help='model to use to extract features')
+    parser.add_argument('--model', default='dgcnn', type=str, help='model to use to extract features')
     parser.add_argument('--embedder', help='if True add a an embedding model from the feature space to B2', action='store_true')
     parser.add_argument('--k', default=10, type=int, help='if model dgcnn, k is the number of neigh to take into account')
     parser.add_argument('--hidden', default=64, type=int, help='number of hidden features')
