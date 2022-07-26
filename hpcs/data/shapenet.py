@@ -8,7 +8,7 @@ from torch_geometric.loader import DataLoader
 category = 'Airplane'  # Pass in `None` to train on all categories.
 path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'ShapeNet')
 
-pre_transform, transform = T.NormalizeScale(), T.FixedPoints(256)
+pre_transform, transform = T.NormalizeScale(), T.FixedPoints(128)
 train_dataset = ShapeNet(path, category, split='train', transform=transform, pre_transform=pre_transform)
 valid_dataset = ShapeNet(path, category, split='val', transform=transform, pre_transform=pre_transform)
 test_dataset = ShapeNet(path, category, split='test', transform=transform, pre_transform=pre_transform)
