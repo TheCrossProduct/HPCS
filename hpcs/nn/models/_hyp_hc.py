@@ -24,80 +24,6 @@ from . import TransformNet
 from . import MLP
 
 
-class EulerFeatExtract(torch.nn.Module):
-    def __init__(self, in_channels: int, hidden_features: int, negative_slope: float = 0.2, bias: bool = True,
-                 dropout: float = 0.0, init_gamma: float = math.pi / 2):
-        super(EulerFeatExtract, self).__init__()
-
-        self.gamma = torch.nn.Parameter(torch.Tensor([init_gamma]), requires_grad=True)
-
-        self.mlp1 = MLP([in_channels, hidden_features, hidden_features], negative_slope=negative_slope,
-                        dropout=dropout, bias=bias)
-
-        self.mlp2 = MLP([in_channels, hidden_features, hidden_features], negative_slope=negative_slope, dropout=dropout,
-                        bias=bias)
-        self.linear = Seq(
-            Linear(in_features=hidden_features, out_features=1, bias=True),
-            BatchNorm1d(1)
-        )
-
-    def forward(self, x):
-        x = self.mlp1(x)
-        # x2 = self.mlp2(x)
-        # return torch.cat([x1, x2], dim=1)
-        x = self.linear(x)
-        # x = (x - x.min()) / (x.max() - x.min())
-        return torch.cat([torch.cos(self.gamma * x), torch.sin(self.gamma * x)], dim=1)
-
-
-class FeatureExtraction(torch.nn.Module):
-    def __init__(self, in_channels: int, out_features: int, hidden_features: int, k: int, transformer: bool = False,
-                 negative_slope: float = 0.2, dropout=0.0, cosine=False):
-        super(FeatureExtraction, self).__init__()
-        self.in_channels = in_channels
-        self.hidden_features = hidden_features
-        self.out_features = out_features
-        self.k = k
-        self.negative_slope = negative_slope
-        self.cosine = cosine
-        self.transformer = transformer
-
-        if self.transformer:
-            self.tnet = TransformNet()
-
-        self.conv1 = DynamicEdgeConv(
-            nn=MLP([2 * in_channels, hidden_features], dropout=dropout, negative_slope=self.negative_slope),
-            k=self.k,
-            cosine=False,
-        )
-        self.conv2 = DynamicEdgeConv(
-            nn=MLP([2 * hidden_features, hidden_features], dropout=dropout, negative_slope=self.negative_slope),
-            k=self.k,
-            cosine=False,
-        )
-        self.conv3 = DynamicEdgeConv(
-            nn=MLP([2 * hidden_features, out_features], dropout=dropout, negative_slope=self.negative_slope),
-            k=self.k,
-            cosine=self.cosine,
-        )
-
-    def forward(self, x, batch=None):
-        if self.transformer:
-            tr = self.tnet(x, batch=batch)
-
-            if batch is None:
-                x = torch.matmul(x, tr[0])
-            else:
-                batch_size = batch.max().item() + 1
-                x = torch.cat([torch.matmul(x[batch == i], tr[i]) for i in range(batch_size)])
-
-        x = self.conv1(x, batch=batch)
-        x = self.conv2(x, batch=batch)
-        x = self.conv3(x, batch=batch)
-
-        return x
-
-
 class SimilarityHypHC(pl.LightningModule):
     """
 
@@ -237,7 +163,7 @@ class SimilarityHypHC(pl.LightningModule):
 
         return Z
 
-    def forward(self, x, y, labels=None, batch=None, decode=False):
+    def forward(self, x, y, pos, labels=None, batch=None, decode=False):
 
         if batch is None:
             batch = torch.zeros(x.size(0), dtype=torch.long)
@@ -245,7 +171,7 @@ class SimilarityHypHC(pl.LightningModule):
         batch_size = batch.max() + 1
 
         # feature extractor
-        x = self.model(x)
+        x = self.model(x, pos)
 
         if isinstance(self.embedder, torch.nn.Module):
             x_emb = self.embedder(x)
@@ -281,13 +207,14 @@ class SimilarityHypHC(pl.LightningModule):
 
         x = data.x
         y = data.y
+        pos = data.pos
         batch = data.batch
         if hasattr(data, 'labels'):
             labels = data.labels
         else:
             labels = None
 
-        x, loss_triplet, loss_hyphc, link_mat = self(x=x, y=y, labels=labels, batch=batch, decode=decode)
+        x, loss_triplet, loss_hyphc, link_mat = self(x=x, y=y, pos=pos, labels=labels, batch=batch, decode=decode)
 
         return x, loss_triplet, loss_hyphc, link_mat
 

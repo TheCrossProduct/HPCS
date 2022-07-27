@@ -4,8 +4,8 @@ from torch.nn import Module, Sequential as Seq, Dropout, Linear, functional as F
 from torch_geometric.nn import DynamicEdgeConv
 
 from hpcs.nn.conv import BilateralConv
-from ._point_net import TransformNet, TNet
-from . import MLP
+from hpcs.nn.models.networks._point_net import TransformNet, TNet
+from hpcs.nn.models import MLP
 
 
 class DGCNN(Module):

@@ -4,13 +4,13 @@ from torch.nn import Parameter
 from torch.nn.init import xavier_normal_
 from typing import Optional
 from torch_geometric.typing import OptTensor
-from torch_geometric.nn import MessagePassing, knn_graph, DynamicEdgeConv
+from torch_geometric.nn import MessagePassing, knn_graph
 from torch_geometric.nn.inits import ones
 from torch_geometric.utils.num_nodes import maybe_num_nodes
 from torch_scatter import scatter
 
-from hpcs.nn.models._mlp import MLP
-from ..init import init_weights
+from hpcs.nn.models.networks._mlp import MLP
+from ..__init__ import init_weights
 
 class BilateralConv(MessagePassing):
     def __init__(self,

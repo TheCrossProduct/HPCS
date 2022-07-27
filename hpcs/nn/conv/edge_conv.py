@@ -6,7 +6,7 @@ from torch import Tensor
 from torch.nn.init import xavier_uniform_
 from torch_geometric.nn.conv import MessagePassing
 
-from hpcs.nn.init import init_weights
+from hpcs.nn.__init__ import init_weights
 
 try:
     from torch_cluster import knn

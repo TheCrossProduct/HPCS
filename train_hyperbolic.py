@@ -7,9 +7,10 @@ from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from torch_geometric.data import DataLoader, DataListLoader
 from torch.utils.data import DistributedSampler
 
-from torch_geometric import transforms as T
-from hpcs.nn.models._hyp_hc import SimilarityHypHC, FeatureExtraction, EulerFeatExtract
-from hpcs.nn.models._mlp import MLP
+from hpcs.nn.models.encoders.dgcnn import DGCNN
+from hpcs.nn.models.encoders.euler import EulerFeatExtract
+from hpcs.nn.models.encoders.point_transformer import PointTransformer
+from hpcs.nn.models.networks._mlp import MLP
 from hpcs.data.toy_dataset import ToyDatasets
 
 class MyTensorBoardLogger(TensorBoardLogger):

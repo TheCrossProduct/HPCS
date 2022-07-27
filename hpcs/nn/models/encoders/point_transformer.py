@@ -1,10 +1,11 @@
 import torch
 import torch.nn.functional as F
+import torch_geometric.nn
 from torch.nn import Linear as Lin
 from torch_cluster import fps, knn_graph
 from torch_scatter import scatter_max
 
-from torch_geometric.nn import MLP, knn_interpolate
+from torch_geometric.nn import MLP, global_mean_pool
 from torch_geometric.nn.conv import PointTransformerConv
 from torch_geometric.nn.pool import knn
 
@@ -76,18 +77,14 @@ class PointTransformer(torch.nn.Module):
         # first block
         self.mlp_input = MLP([in_channels, dim_model[0]], plain_last=False)
 
-        self.transformer_input = TransformerBlock(
-            in_channels=dim_model[0],
-            out_channels=dim_model[0],
-        )
-
+        self.transformer_input = TransformerBlock(in_channels=dim_model[0],
+                                                  out_channels=dim_model[0])
         # backbone layers
         self.transformers_down = torch.nn.ModuleList()
         self.transition_down = torch.nn.ModuleList()
 
-        for i in range(0, len(dim_model) - 1):
-
-            # Add Transition Down block followed by a Point Transformer block
+        for i in range(len(dim_model) - 1):
+            # Add Transition Down block followed by a Transformer block
             self.transition_down.append(
                 TransitionDown(in_channels=dim_model[i],
                                out_channels=dim_model[i + 1], k=self.k))
@@ -96,53 +93,29 @@ class PointTransformer(torch.nn.Module):
                 TransformerBlock(in_channels=dim_model[i + 1],
                                  out_channels=dim_model[i + 1]))
 
-
-        # summit layers
-        self.mlp_summit = MLP([dim_model[-1], dim_model[-1]], norm=None,
-                              plain_last=False)
-
-        self.transformer_summit = TransformerBlock(
-            in_channels=dim_model[-1],
-            out_channels=dim_model[-1],
-        )
-
         # class score computation
-        self.mlp_output = MLP([dim_model[0], 64, out_channels], norm=None)
+        self.mlp_output = MLP([dim_model[-1], 64, out_channels], norm=None)
 
     def forward(self, x, pos, batch=None):
 
         # add dummy features in case there is none
         if x is None:
-            x = torch.ones((pos.shape[0], 1)).to(pos.get_device())
-
-        out_x = []
-        out_pos = []
-        out_batch = []
+            x = torch.ones((pos.shape[0], 1), device=pos.get_device())
 
         # first block
         x = self.mlp_input(x)
         edge_index = knn_graph(pos, k=self.k, batch=batch)
         x = self.transformer_input(x, pos, edge_index)
 
-        # save outputs for skipping connections
-        out_x.append(x)
-        out_pos.append(pos)
-        out_batch.append(batch)
-
-        # backbone down : #reduce cardinality and augment dimensionnality
+        # backbone
         for i in range(len(self.transformers_down)):
             x, pos, batch = self.transition_down[i](x, pos, batch=batch)
+
             edge_index = knn_graph(pos, k=self.k, batch=batch)
             x = self.transformers_down[i](x, pos, edge_index)
 
-            out_x.append(x)
-            out_pos.append(pos)
-            out_batch.append(batch)
-
-        # summit
-        x = self.mlp_summit(x)
-        edge_index = knn_graph(pos, k=self.k, batch=batch)
-        x = self.transformer_summit(x, pos, edge_index)
+        # GlobalAveragePooling
+        x = global_mean_pool(x, batch)
 
         # Class score
         out = self.mlp_output(x)
@@ -150,67 +123,44 @@ class PointTransformer(torch.nn.Module):
         return F.log_softmax(out, dim=-1)
 
 
-# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# model = PointTransformer(3, train_dataset.num_classes, dim_model=[32, 64, 128, 256, 512],
-#             k=16).to(device)
-# optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-# scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
-#
-#
 # def train():
 #     model.train()
 #
-#     total_loss = correct_nodes = total_nodes = 0
-#     for i, data in enumerate(train_loader):
+#     total_loss = 0
+#     for data in train_loader:
 #         data = data.to(device)
 #         optimizer.zero_grad()
 #         out = model(data.x, data.pos, data.batch)
 #         loss = F.nll_loss(out, data.y)
 #         loss.backward()
+#         total_loss += loss.item() * data.num_graphs
 #         optimizer.step()
-#         total_loss += loss.item()
-#         correct_nodes += out.argmax(dim=1).eq(data.y).sum().item()
-#         total_nodes += data.num_nodes
-#
-#         if (i + 1) % 10 == 0:
-#             print(f'[{i+1}/{len(train_loader)}] Loss: {total_loss / 10:.4f} '
-#                   f'Train Acc: {correct_nodes / total_nodes:.4f}')
-#             total_loss = correct_nodes = total_nodes = 0
+#     return total_loss / len(train_dataset)
 #
 #
+# @torch.no_grad()
 # def test(loader):
 #     model.eval()
 #
-#     ious, categories = [], []
-#     y_map = torch.empty(loader.dataset.num_classes, device=device).long()
+#     correct = 0
 #     for data in loader:
 #         data = data.to(device)
-#         outs = model(data.x, data.pos, data.batch)
-#
-#         sizes = (data.ptr[1:] - data.ptr[:-1]).tolist()
-#         for out, y, category in zip(outs.split(sizes), data.y.split(sizes),
-#                                     data.category.tolist()):
-#             category = list(ShapeNet.seg_classes.keys())[category]
-#             part = ShapeNet.seg_classes[category]
-#             part = torch.tensor(part, device=device)
-#
-#             y_map[part] = torch.arange(part.size(0), device=device)
-#
-#             iou = jaccard_index(out[:, part].argmax(dim=-1), y_map[y],
-#                                 num_classes=part.size(0), absent_score=1.0)
-#             ious.append(iou)
-#
-#         categories.append(data.category)
-#
-#     iou = torch.tensor(ious, device=device)
-#     category = torch.cat(categories, dim=0)
-#
-#     mean_iou = scatter(iou, category, reduce='mean')  # Per-category IoU.
-#     return float(mean_iou.mean())  # Global IoU.
+#         pred = model(data.x, data.pos, data.batch).max(dim=1)[1]
+#         correct += pred.eq(data.y).sum().item()
+#     return correct / len(loader.dataset)
 #
 #
-# for epoch in range(1, 100):
-#     train()
-#     iou = test(test_loader)
-#     print(f'Epoch: {epoch:03d}, Test IoU: {iou:.4f}')
-#     scheduler.step()
+# if __name__ == '__main__':
+#
+#     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#     model = PointTransformer(0, train_dataset.num_classes,
+#                 dim_model=[32, 64, 128, 256, 512], k=16).to(device)
+#     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+#     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20,
+#                                                 gamma=0.5)
+#
+#     for epoch in range(1, 201):
+#         loss = train()
+#         test_acc = test(test_loader)
+#         print(f'Epoch {epoch:03d}, Loss: {loss:.4f}, Test: {test_acc:.4f}')
+#         scheduler.step()

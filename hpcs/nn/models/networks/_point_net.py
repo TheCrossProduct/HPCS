@@ -5,7 +5,7 @@ from torch.nn import functional as F
 from torch_scatter import scatter
 from torch_geometric.nn import DynamicEdgeConv
 
-from . import MLP
+from hpcs.nn.models import MLP
 
 
 class TransformNet(nn.Module):

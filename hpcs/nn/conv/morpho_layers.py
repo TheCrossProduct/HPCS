@@ -9,7 +9,7 @@ from torch_scatter import scatter, segment_csr
 from torch_geometric.nn import MessagePassing, knn_graph
 from torch_geometric.nn.inits import normal, zeros, reset
 
-from hpcs.nn.models._mlp import MLP
+from hpcs.nn.models.networks._mlp import MLP
 
 
 def dot_operation(x, weights):

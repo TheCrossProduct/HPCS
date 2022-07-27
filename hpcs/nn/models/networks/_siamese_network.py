@@ -21,8 +21,8 @@ from smutsia.nn.distances.poincare import project
 from smutsia.nn.conv import DynamicEdgeConv
 
 from smutsia.nn.optim import RAdam
-from . import TransformNet
-from .. import MLP
+from hpcs.nn.models import TransformNet
+from hpcs.nn import MLP
 
 
 class EulerFeatExtract(torch.nn.Module):
