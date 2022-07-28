@@ -54,7 +54,7 @@ if __name__ == "__main__":
     parser.add_argument('--gpu', default="0", type=str, help='use gpu')
     parser.add_argument('--distributed', help='if True run on a cluster machine', action='store_true')
     parser.add_argument('--num_workers', type=int, default=6)
-    parser.add_argument('--fixed_points', type=int, default=256)
+    parser.add_argument('--fixed_points', type=int, default=150)
 
 
     args = parser.parse_args()
