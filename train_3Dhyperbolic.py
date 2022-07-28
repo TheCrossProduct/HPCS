@@ -47,7 +47,7 @@ if __name__ == "__main__":
     parser.add_argument('--annealing', default=1.0, type=float, help='annealing factor')
     parser.add_argument('--anneal_step', default=0, type=int, help='use annealing each n step')
     parser.add_argument('--batch', default=6, type=int, help='batch size')
-    parser.add_argument('--epochs', default=50, type=int, help='number of epochs')
+    parser.add_argument('--epochs', default=30, type=int, help='number of epochs')
     parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
     parser.add_argument('--patience', default=50, type=int, help='patience value for early stopping')
     parser.add_argument('--plot', default=-1, type=int, help='interval in which we plot prediction on validation batch')
