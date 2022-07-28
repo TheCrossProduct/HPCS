@@ -46,7 +46,7 @@ if __name__ == "__main__":
     parser.add_argument('--temperature', default=0.05, type=float, help='rescale softmax value used in the hyphc loss')
     parser.add_argument('--annealing', default=1.0, type=float, help='annealing factor')
     parser.add_argument('--anneal_step', default=0, type=int, help='use annealing each n step')
-    parser.add_argument('--batch', default=4, type=int, help='batch size')
+    parser.add_argument('--batch', default=6, type=int, help='batch size')
     parser.add_argument('--epochs', default=50, type=int, help='number of epochs')
     parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
     parser.add_argument('--patience', default=50, type=int, help='patience value for early stopping')
