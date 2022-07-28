@@ -5,7 +5,7 @@ from torch.nn import Linear as Lin
 from torch_cluster import fps, knn_graph
 from torch_scatter import scatter_max
 
-from torch_geometric.nn import MLP, global_mean_pool
+from torch_geometric.nn import MLP, knn_interpolate
 from torch_geometric.nn.conv import PointTransformerConv
 from torch_geometric.nn.pool import knn
 
@@ -43,7 +43,7 @@ class TransitionDown(torch.nn.Module):
         self.ratio = ratio
         self.mlp = MLP([in_channels, out_channels], plain_last=False)
 
-    def forward(self, x, pos, batch):
+    def forward(self, x, pos, batch=None):
         # FPS sampling
         id_clusters = fps(pos, ratio=self.ratio, batch=batch)
 
@@ -65,6 +65,28 @@ class TransitionDown(torch.nn.Module):
         sub_pos, out = pos[id_clusters], x_out
         return out, sub_pos, sub_batch
 
+class TransitionUp(torch.nn.Module):
+    '''
+        Reduce features dimensionnality and interpolate back to higher
+        resolution and cardinality
+    '''
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.mlp_sub = MLP([in_channels, out_channels], plain_last=False)
+        self.mlp = MLP([out_channels, out_channels], plain_last=False)
+
+    def forward(self, x, x_sub, pos, pos_sub, batch=None, batch_sub=None):
+        # transform low-res features and reduce the number of features
+        x_sub = self.mlp_sub(x_sub)
+
+        # interpolate low-res feats to high-res points
+        x_interpolated = knn_interpolate(x_sub, pos_sub, pos, k=3,
+                                         batch_x=batch_sub, batch_y=batch)
+
+        x = self.mlp(x) + x_interpolated
+
+        return x
+
 
 class PointTransformer(torch.nn.Module):
     def __init__(self, in_channels, out_channels, dim_model, k=16):
@@ -77,14 +99,19 @@ class PointTransformer(torch.nn.Module):
         # first block
         self.mlp_input = MLP([in_channels, dim_model[0]], plain_last=False)
 
-        self.transformer_input = TransformerBlock(in_channels=dim_model[0],
-                                                  out_channels=dim_model[0])
+        self.transformer_input = TransformerBlock(
+            in_channels=dim_model[0],
+            out_channels=dim_model[0],
+        )
+
         # backbone layers
+        self.transformers_up = torch.nn.ModuleList()
         self.transformers_down = torch.nn.ModuleList()
+        self.transition_up = torch.nn.ModuleList()
         self.transition_down = torch.nn.ModuleList()
 
-        for i in range(len(dim_model) - 1):
-            # Add Transition Down block followed by a Transformer block
+        for i in range(0, len(dim_model) - 1):
+            # Add Transition Down block followed by a Point Transformer block
             self.transition_down.append(
                 TransitionDown(in_channels=dim_model[i],
                                out_channels=dim_model[i + 1], k=self.k))
@@ -93,74 +120,76 @@ class PointTransformer(torch.nn.Module):
                 TransformerBlock(in_channels=dim_model[i + 1],
                                  out_channels=dim_model[i + 1]))
 
+            # Add Transition Up block followed by Point Transformer block
+            self.transition_up.append(
+                TransitionUp(in_channels=dim_model[i + 1],
+                             out_channels=dim_model[i]))
+
+            self.transformers_up.append(
+                TransformerBlock(in_channels=dim_model[i],
+                                 out_channels=dim_model[i]))
+
+        # summit layers
+        self.mlp_summit = MLP([dim_model[-1], dim_model[-1]], norm=None,
+                              plain_last=False)
+
+        self.transformer_summit = TransformerBlock(
+            in_channels=dim_model[-1],
+            out_channels=dim_model[-1],
+        )
+
         # class score computation
-        self.mlp_output = MLP([dim_model[-1], 64, out_channels], norm=None)
+        self.mlp_output = MLP([dim_model[0], 64, out_channels], norm=None)
 
     def forward(self, x, pos, batch=None):
 
         # add dummy features in case there is none
         if x is None:
-            x = torch.ones((pos.shape[0], 1), device=pos.get_device())
+            x = torch.ones((pos.shape[0], 1)).to(pos.get_device())
+
+        out_x = []
+        out_pos = []
+        out_batch = []
 
         # first block
         x = self.mlp_input(x)
         edge_index = knn_graph(pos, k=self.k, batch=batch)
         x = self.transformer_input(x, pos, edge_index)
 
-        # backbone
+        # save outputs for skipping connections
+        out_x.append(x)
+        out_pos.append(pos)
+        out_batch.append(batch)
+
+        # backbone down : #reduce cardinality and augment dimensionnality
         for i in range(len(self.transformers_down)):
             x, pos, batch = self.transition_down[i](x, pos, batch=batch)
-
             edge_index = knn_graph(pos, k=self.k, batch=batch)
             x = self.transformers_down[i](x, pos, edge_index)
 
-        # GlobalAveragePooling
-        x = global_mean_pool(x, batch)
+            out_x.append(x)
+            out_pos.append(pos)
+            out_batch.append(batch)
+
+        # summit
+        x = self.mlp_summit(x)
+        edge_index = knn_graph(pos, k=self.k, batch=batch)
+        x = self.transformer_summit(x, pos, edge_index)
+
+        # backbone up : augment cardinality and reduce dimensionnality
+        n = len(self.transformers_down)
+        for i in range(n):
+            x = self.transition_up[-i - 1](x=out_x[-i - 2], x_sub=x,
+                                           pos=out_pos[-i - 2],
+                                           pos_sub=out_pos[-i - 1],
+                                           batch_sub=out_batch[-i - 1],
+                                           batch=out_batch[-i - 2])
+
+            edge_index = knn_graph(out_pos[-i - 2], k=self.k,
+                                   batch=out_batch[-i - 2])
+            x = self.transformers_up[-i - 1](x, out_pos[-i - 2], edge_index)
 
         # Class score
         out = self.mlp_output(x)
 
         return F.log_softmax(out, dim=-1)
-
-
-# def train():
-#     model.train()
-#
-#     total_loss = 0
-#     for data in train_loader:
-#         data = data.to(device)
-#         optimizer.zero_grad()
-#         out = model(data.x, data.pos, data.batch)
-#         loss = F.nll_loss(out, data.y)
-#         loss.backward()
-#         total_loss += loss.item() * data.num_graphs
-#         optimizer.step()
-#     return total_loss / len(train_dataset)
-#
-#
-# @torch.no_grad()
-# def test(loader):
-#     model.eval()
-#
-#     correct = 0
-#     for data in loader:
-#         data = data.to(device)
-#         pred = model(data.x, data.pos, data.batch).max(dim=1)[1]
-#         correct += pred.eq(data.y).sum().item()
-#     return correct / len(loader.dataset)
-#
-#
-# if __name__ == '__main__':
-#
-#     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-#     model = PointTransformer(0, train_dataset.num_classes,
-#                 dim_model=[32, 64, 128, 256, 512], k=16).to(device)
-#     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-#     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20,
-#                                                 gamma=0.5)
-#
-#     for epoch in range(1, 201):
-#         loss = train()
-#         test_acc = test(test_loader)
-#         print(f'Epoch {epoch:03d}, Loss: {loss:.4f}, Test: {test_acc:.4f}')
-#         scheduler.step()

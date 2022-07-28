@@ -13,6 +13,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
 from hpcs.nn.models._hyp_hc import SimilarityHypHC
 from hpcs.nn.models.encoders.dgcnn import DGCNN
+from hpcs.nn.models.encoders.dgcnn2 import DGCNN2
 from hpcs.nn.models.encoders.euler import EulerFeatExtract
 from hpcs.nn.models.encoders.point_transformer import PointTransformer
 from hpcs.nn.models.encoders.pointnet2 import PointNet2
@@ -33,7 +34,7 @@ if __name__ == "__main__":
     # parser.add_argument('--max_noise', default=0.15, type=float, help='max value of noise to use')
     # parser.add_argument('--cluster_std', default=0.1, type=float, help='std blobs')
     # parser.add_argument('--num_blobs', default=3, type=int, help='number of blobs in blob/aniso/varied')
-    parser.add_argument('--model', default='point_transformer', type=str, help='model to use to extract features')
+    parser.add_argument('--model', default='dgcnn2', type=str, help='model to use to extract features')
     parser.add_argument('--embedder', help='if True add a an embedding model from the feature space to B2', action='store_true')
     parser.add_argument('--k', default=10, type=int, help='if model dgcnn, k is the number of neigh to take into account')
     parser.add_argument('--hidden', default=64, type=int, help='number of hidden features')
@@ -145,10 +146,12 @@ if __name__ == "__main__":
     if model_name == 'dgcnn':
         nn = DGCNN(in_channels=3, hidden_features=hidden, out_features=out_features, k=k, transformer=False,
                                dropout=dropout, negative_slope=negative_slope, cosine=cosine)
+    elif model_name == 'dgcnn2':
+        nn = DGCNN2(in_channels=6, out_channels=out_features, k=30)
     elif model_name == 'point_transformer':
-        nn = PointTransformer(in_channels=3, out_channels=train_dataset.num_classes, dim_model=[32, 64, 128, 256, 512], k=16)
+        nn = PointTransformer(in_channels=3, out_channels=out_features, dim_model=[32, 64, 128, 256, 512], k=30)
     elif model_name == 'pointnet2':
-        nn = PointNet2(train_dataset.num_classes)
+        nn = PointNet2(in_channels=6, out_channels=out_features)
     elif model_name == 'euler':
         nn = EulerFeatExtract(in_channels=3, hidden_features=hidden, dropout=dropout, negative_slope=negative_slope)
     else:

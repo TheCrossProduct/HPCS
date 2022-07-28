@@ -171,7 +171,7 @@ class SimilarityHypHC(pl.LightningModule):
         batch_size = batch.max() + 1
 
         # feature extractor
-        x = self.model(x, pos)
+        x = self.model(x, pos, batch)
 
         if isinstance(self.embedder, torch.nn.Module):
             x_emb = self.embedder(x)
