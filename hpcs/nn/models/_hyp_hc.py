@@ -225,10 +225,7 @@ class SimilarityHypHC(pl.LightningModule):
         best_k = 0
         best_pred = None
         for k in range(1, n_clusters + 5):
-            print(k)
             y_pred = fcluster(linkage_matrix, k, criterion='maxclust') - 1
-            print(len(y))
-            print(len(y_pred))
             k_ri = ri(y, y_pred)
             if k_ri > best_ri:
                 best_ri = k_ri

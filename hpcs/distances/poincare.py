@@ -82,13 +82,13 @@ def mobius_add(x, y):
 
 def mobius_transf(z, x, pairwise=True):
     # mobius transf that maps x to origin and y to M(y)
-    assert x.shape == z.shape
-    n_samples, n_feat = x.shape[:2]
-    assert n_feat % 2 == 0
-    z1 = z.reshape(-1, 2)
-    x1 = x.reshape(-1, 2)
-    z1 = torch.view_as_complex(z1)
-    x1 = torch.view_as_complex(x1)
+    # assert x.shape == z.shape
+    # n_samples, n_feat = x.shape[:2]
+    # assert n_feat % 2 == 0
+    # z1 = z.reshape(-1, 2)
+    # x1 = x.reshape(-1, 2)
+    z1 = torch.view_as_complex(z)
+    x1 = torch.view_as_complex(x)
 
     if not pairwise:
         if z1.dim() == 1:
@@ -102,17 +102,18 @@ def mobius_transf(z, x, pairwise=True):
 
     out = torch.view_as_real(out)
 
-    return out.reshape(n_samples, n_feat)
+    # return out.reshape(n_samples, n_feat)
+    return out
 
 def inverse_mobius_transf(z, x, pairwise=True):
     # inverse map of mobius transf
-    assert x.shape == z.shape
-    n_samples, n_feat = x.shape[:2]
-    assert n_feat % 2 == 0
-    z1 = z.reshape(-1, 2)
-    x1 = x.reshape(-1, 2)
-    z1 = torch.view_as_complex(z1)
-    x1 = torch.view_as_complex(x1)
+    # assert x.shape == z.shape
+    # n_samples, n_feat = x.shape[:2]
+    # assert n_feat % 2 == 0
+    # z1 = z.reshape(-1, 2)
+    # x1 = x.reshape(-1, 2)
+    z1 = torch.view_as_complex(z)
+    x1 = torch.view_as_complex(x)
 
     if not pairwise:
         if z1.dim() == 1:
@@ -125,8 +126,8 @@ def inverse_mobius_transf(z, x, pairwise=True):
 
     out = num / den
     out = torch.view_as_real(out)
-    return out.reshape(n_samples, n_feat)
-
+    # return out.reshape(n_samples, n_feat)
+    return out
 
 
 def mobius_mul(x, t):
