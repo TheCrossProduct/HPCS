@@ -7,7 +7,7 @@ from hpcs.nn.models.networks._mlp import MLP
 
 class DGCNN(torch.nn.Module):
     def __init__(self, in_channels: int, out_features: int, hidden_features: int, k: int, transformer: bool = False,
-                 negative_slope: float = 0.2, dropout=0.0, cosine=False):
+                 negative_slope: float = 0.2, dropout: float = 0.0, cosine: bool = False):
         super(DGCNN, self).__init__()
         self.in_channels = in_channels
         self.hidden_features = hidden_features
