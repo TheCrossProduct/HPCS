@@ -1,6 +1,7 @@
 import itertools
 import numpy as np
 import pyvista as pv
+from pyvistaqt import BackgroundPlotter
 import matplotlib as mpl
 import colorsys
 import matplotlib.colors as mc
@@ -73,7 +74,7 @@ def plot_cloud(xyz,
         return plotter
     """
     if notebook:
-        plotter = pv.BackgroundPlotter(title=title)
+        plotter = BackgroundPlotter(title=title)
     else:
         plotter = pv.Plotter(title=title)
 
