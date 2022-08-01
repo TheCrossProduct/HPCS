@@ -166,9 +166,9 @@ if __name__ == "__main__":
     trainer = pl.Trainer(gpus=gpu,
                          max_epochs=epochs,
                          callbacks=[early_stop_callback, checkpoint_callback],
-                         logger=logger,
-                         limit_train_batches=1,
-                         limit_test_batches=1
+                         logger=logger
+                         # limit_train_batches=1,
+                         # limit_test_batches=1
                          # track_grad_norm=2
                          )
 
