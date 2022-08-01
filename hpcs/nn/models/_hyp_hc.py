@@ -281,6 +281,7 @@ class SimilarityHypHC(pl.LightningModule):
         # self.logger.log_metrics({'ari@k': ri_score, 'purity@k': pu_score, 'nmi@k': nmi_score,
         #                          'ari': best_ri, 'best_k': k}, step=batch_idx)
 
+        self.log("test_loss", test_loss, batch_size=data.batch.shape[0])
         return {'test_loss': test_loss, 'test_ri@k': torch.tensor(ri_score),
                 'test_pu@k': torch.tensor(pu_score), 'test_nmi@k': torch.tensor(nmi_score),
                 'test_ri': torch.tensor(best_ri), 'k': torch.tensor(k, dtype=torch.float)}
