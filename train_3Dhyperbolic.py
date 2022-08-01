@@ -172,7 +172,8 @@ if __name__ == "__main__":
         mode='min')
 
 
-    trainer = pl.Trainer(gpus=gpu, max_epochs=epochs, limit_train_batches=20, log_every_n_steps=10,
+    trainer = pl.Trainer(gpus=gpu,
+                         max_epochs=epochs,
                          callbacks=[early_stop_callback, checkpoint_callback],
                          logger=logger,
                          # track_grad_norm=2
