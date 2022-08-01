@@ -254,15 +254,15 @@ class SimilarityHypHC(pl.LightningModule):
         y_pred_k, k, best_ri = get_optimal_k(data.y.detach().cpu().numpy(), linkage_matrix[0])
         pu_score, nmi_score, ri_score = eval_clustering(y_true=data.y.detach().cpu(), Z=linkage_matrix[0])
 
-        fig = plot_hyperbolic_eval(x=data.x.detach().cpu(),
-                                   y=data.y.detach().cpu(),
-                                   labels=data.labels.detach().cpu(),
-                                   y_pred=y_pred_k,
-                                   emb=self.triplet_loss._rescale_emb(x).detach().cpu(),
-                                   linkage_matrix=linkage_matrix[0],
-                                   emb_scale=self.rescale.item(),
-                                   k=k,
-                                   show=False)
+        # fig = plot_hyperbolic_eval(x=data.x.detach().cpu(),
+        #                            y=data.y.detach().cpu(),
+        #                            labels=data.labels.detach().cpu(),
+        #                            y_pred=y_pred_k,
+        #                            emb=self.triplet_loss._rescale_emb(x).detach().cpu(),
+        #                            linkage_matrix=linkage_matrix[0],
+        #                            emb_scale=self.rescale.item(),
+        #                            k=k,
+        #                            show=False)
 
         # n_clusters = data.y.max() + 1
         # y_pred = fcluster(linkage_matrix[0], n_clusters, criterion='maxclust') - 1

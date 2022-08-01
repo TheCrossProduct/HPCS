@@ -2,6 +2,7 @@ import torch
 import math
 
 from torch.nn import functional as F, Linear, Sequential as Seq, BatchNorm1d, Dropout
+from torch_geometric.nn import MLP
 
 
 class EulerFeatExtract(torch.nn.Module):

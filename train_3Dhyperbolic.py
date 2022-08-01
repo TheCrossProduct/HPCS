@@ -12,13 +12,10 @@ from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
 from hpcs.nn.models._hyp_hc import SimilarityHypHC
-from hpcs.nn.models.encoders.dgcnn import DGCNN
 from hpcs.nn.models.encoders.dgcnn2 import DGCNN2
 from hpcs.nn.models.encoders.euler import EulerFeatExtract
 from hpcs.nn.models.encoders.point_transformer import PointTransformer
 from hpcs.nn.models.encoders.pointnet2 import PointNet2
-
-from hpcs.nn.models.networks._mlp import MLP
 
 
 if __name__ == "__main__":
@@ -37,8 +34,8 @@ if __name__ == "__main__":
     parser.add_argument('--temperature', default=0.05, type=float, help='rescale softmax value used in the hyphc loss')
     parser.add_argument('--annealing', default=1.0, type=float, help='annealing factor')
     parser.add_argument('--anneal_step', default=0, type=int, help='use annealing each n step')
-    parser.add_argument('--batch', default=6, type=int, help='batch size')
-    parser.add_argument('--epochs', default=30, type=int, help='number of epochs')
+    parser.add_argument('--batch', default=1, type=int, help='batch size')
+    parser.add_argument('--epochs', default=1, type=int, help='number of epochs')
     parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
     parser.add_argument('--patience', default=50, type=int, help='patience value for early stopping')
     parser.add_argument('--plot', default=-1, type=int, help='interval in which we plot prediction on validation batch')
@@ -103,21 +100,16 @@ if __name__ == "__main__":
         replace_sampler_ddp = True
 
 
-    out_features = hidden if embedder else 2
+    out_features = 2
     # todo parametrize this
-    if model_name == 'dgcnn':
-        nn = DGCNN(in_channels=3, hidden_features=hidden, out_features=out_features, k=k, transformer=False,
-                               dropout=dropout, negative_slope=negative_slope, cosine=cosine)
+    if model_name == 'dgcnn2':
+        nn = DGCNN2(in_channels=6, out_channels=out_features, k=30)
     elif model_name == 'dgcnn2':
         nn = DGCNN2(in_channels=6, out_channels=out_features, k=30)
     elif model_name == 'point_transformer':
         nn = PointTransformer(in_channels=3, out_channels=out_features, dim_model=[32, 64, 128, 256, 512], k=30)
     elif model_name == 'pointnet2':
         nn = PointNet2(in_channels=6, out_channels=out_features)
-    elif model_name == 'euler':
-        nn = EulerFeatExtract(in_channels=3, hidden_features=hidden, dropout=dropout, negative_slope=negative_slope)
-    else:
-        nn = MLP([3, hidden, hidden, hidden, hidden, out_features], dropout=dropout, negative_slope=negative_slope)
 
     nn_emb = EulerFeatExtract(in_channels=hidden, hidden_features=hidden, dropout=dropout, negative_slope=negative_slope) if embedder else None
 
@@ -136,7 +128,6 @@ if __name__ == "__main__":
     logger = WandbLogger(name=dataname, save_dir=os.path.join(logdir, "HPCS"), project="HPCS")
     model_params = {'dataset': dataname,
                     'model': model_name,
-                    'embedder': 'True' if embedder else 'False',
                     'k': k if model_name == 'dgcnn' else -1,
                     'distance': distance,
                     'hidden': hidden,
@@ -176,6 +167,8 @@ if __name__ == "__main__":
                          max_epochs=epochs,
                          callbacks=[early_stop_callback, checkpoint_callback],
                          logger=logger,
+                         limit_train_batches=4,
+                         limit_test_batches=4
                          # track_grad_norm=2
                          )
 
@@ -184,4 +177,4 @@ if __name__ == "__main__":
 
     print("End Training")
 
-    # results = trainer.test(model, test_loader)
+    results = trainer.test(model, test_loader)
