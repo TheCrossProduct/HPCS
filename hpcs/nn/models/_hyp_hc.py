@@ -204,18 +204,16 @@ class SimilarityHypHC(pl.LightningModule):
             print("Temperature Value: ", self.temperature)
 
     def validation_step(self, data, batch_idx):
-        maybe_plot = self.plot_interval > 0 and ((self.current_epoch + 1) % self.plot_interval == 0)
-        x, val_loss_triplet, val_loss_hyphc, linkage_matrix = self._forward(data, decode=maybe_plot)
+        #maybe_plot = self.plot_interval > 0 and ((self.current_epoch + 1) % self.plot_interval == 0)
+        maybe_plot = False
+        x, val_loss_triplet, val_loss_hyphc, linkage_matrix = self._forward(data, decode=False)
         val_loss = val_loss_triplet + val_loss_hyphc
 
         fig = None
         best_ri = 0.0
-        y = data.y.detach().cpu().numpy()
-        print(y.shape)
-        print(y)
-        y_pred, k, best_ri = get_optimal_k(data.y.detach().cpu().numpy(), linkage_matrix[0])
-        if maybe_plot:
 
+        if maybe_plot:
+            y_pred, k, best_ri = get_optimal_k(data.y.detach().cpu().numpy(), linkage_matrix[0])
             pu_score, nmi_score, ri_score = eval_clustering(y_true=data.y.detach().cpu(), Z=linkage_matrix[0])
 
             fig = plot_hyperbolic_eval(x=data.x.detach().cpu(),
@@ -255,12 +253,8 @@ class SimilarityHypHC(pl.LightningModule):
         x, test_loss_triplet, test_loss_hyphc, linkage_matrix = self._forward(data, decode=True)
         test_loss = test_loss_hyphc + test_loss_triplet
 
-        y = data.y.detach().cpu().numpy()
-        print(y.shape)
-        print(y)
-
-        y_pred_k, k, best_ri = get_optimal_k(data.y.detach().cpu().numpy(), linkage_matrix[0])
-        pu_score, nmi_score, ri_score = eval_clustering(y_true=data.y.detach().cpu(), Z=linkage_matrix[0])
+        # y_pred_k, k, best_ri = get_optimal_k(data.y.detach().cpu().numpy(), linkage_matrix[0])
+        acc_score, pu_score, nmi_score, ri_score = eval_clustering(y_true=data.y.detach().cpu(), Z=linkage_matrix[0])
 
         # fig = plot_hyperbolic_eval(x=data.x.detach().cpu(),
         #                            y=data.y.detach().cpu(),
@@ -289,10 +283,10 @@ class SimilarityHypHC(pl.LightningModule):
         # self.logger.log_metrics({'ari@k': ri_score, 'purity@k': pu_score, 'nmi@k': nmi_score,
         #                          'ari': best_ri, 'best_k': k}, step=batch_idx)
 
-        self.log("test_loss", test_loss, batch_size=data.batch.shape[0])
+        self.log("test_loss", test_loss, "Accuracy", acc_score, batch_size=data.batch.shape[0])
         return {'test_loss': test_loss, 'test_ri@k': torch.tensor(ri_score),
-                'test_pu@k': torch.tensor(pu_score), 'test_nmi@k': torch.tensor(nmi_score),
-                'test_ri': torch.tensor(best_ri), 'k': torch.tensor(k, dtype=torch.float)}
+                'test_pu@k': torch.tensor(pu_score), 'test_nmi@k': torch.tensor(nmi_score)}
+                #'test_ri': torch.tensor(best_ri), 'k': torch.tensor(k, dtype=torch.float)}
 
     def test_epoch_end(self, outputs):
 
