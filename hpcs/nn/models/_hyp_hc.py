@@ -254,7 +254,7 @@ class SimilarityHypHC(pl.LightningModule):
         test_loss = test_loss_hyphc + test_loss_triplet
 
         y_pred_k, k, best_ri = get_optimal_k(data.y.detach().cpu().numpy(), linkage_matrix[0])
-        acc_score, pu_score, nmi_score, ri_score = eval_clustering(y_true=data.y.detach().cpu(), Z=linkage_matrix[0])
+        pu_score, nmi_score, ri_score = eval_clustering(y_true=data.y.detach().cpu(), Z=linkage_matrix[0])
 
         # fig = plot_hyperbolic_eval(x=data.x.detach().cpu(),
         #                            y=data.y.detach().cpu(),
@@ -284,7 +284,6 @@ class SimilarityHypHC(pl.LightningModule):
         #                          'ari': best_ri, 'best_k': k}, step=batch_idx)
 
         self.log("test_loss", test_loss, batch_size=data.batch.shape[0])
-        self.log("Accuracy", acc_score, batch_size=data.batch.shape[0])
         return {'test_loss': test_loss, 'test_ri@k': torch.tensor(ri_score),
                 'test_pu@k': torch.tensor(pu_score), 'test_nmi@k': torch.tensor(nmi_score),
                 'test_ri': torch.tensor(best_ri), 'k': torch.tensor(k, dtype=torch.float)}
