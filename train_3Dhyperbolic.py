@@ -81,7 +81,7 @@ if __name__ == "__main__":
 
     train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers)
     valid_loader = DataLoader(valid_dataset, batch_size=batch, shuffle=False, num_workers=num_workers)
-    test_loader = DataLoader(test_dataset, batch_size=batch, shuffle=False, num_workers=num_workers)
+    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
 
     if len(args.gpu):
         gpu = [int(g) for g in args.gpu.split(',')]
@@ -103,8 +103,6 @@ if __name__ == "__main__":
     out_features = 2
     # todo parametrize this
     if model_name == 'dgcnn2':
-        nn = DGCNN2(in_channels=6, out_channels=out_features, k=30)
-    elif model_name == 'dgcnn2':
         nn = DGCNN2(in_channels=6, out_channels=out_features, k=30)
     elif model_name == 'point_transformer':
         nn = PointTransformer(in_channels=3, out_channels=out_features, dim_model=[32, 64, 128, 256, 512], k=30)
@@ -167,8 +165,8 @@ if __name__ == "__main__":
                          max_epochs=epochs,
                          callbacks=[early_stop_callback, checkpoint_callback],
                          logger=logger,
-                         limit_train_batches=4,
-                         limit_test_batches=4,
+                         limit_train_batches=2,
+                         limit_test_batches=2,
                          # track_grad_norm=2
                          )
 

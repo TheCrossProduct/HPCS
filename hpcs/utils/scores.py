@@ -194,12 +194,12 @@ def eval_clustering(y_true, Z):
     _, y_true = np.unique(y_true, return_inverse=True)
     _, y_pred = np.unique(y_pred, return_inverse=True)
 
-    acc_score = accuracy_clustering(y_true, y_pred)
+    # acc_score = accuracy_clustering(y_true, y_pred)
     pu_score = purity(y_true, y_pred)
     nmi_score = nmi(y_true, y_pred, average_method='geometric')  # average_method='arithmetic'
     ri_score = ri(y_true, y_pred)
     # best_pred, best_k, best_ri = get_optimal_k(y_true, Z)
     # return acc_score, pu_score, nmi_score, ri_score
-    return acc_score, pu_score, nmi_score, ri_score
+    return pu_score, nmi_score, ri_score
 
 
