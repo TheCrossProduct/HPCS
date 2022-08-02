@@ -210,6 +210,9 @@ class SimilarityHypHC(pl.LightningModule):
 
         fig = None
         best_ri = 0.0
+        y = data.y.detach().cpu().numpy()
+        print(y.shape)
+        print(y)
         y_pred, k, best_ri = get_optimal_k(data.y.detach().cpu().numpy(), linkage_matrix[0])
         if maybe_plot:
 
