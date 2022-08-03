@@ -6,6 +6,7 @@ import torch_geometric.transforms as T
 from torch_geometric.datasets import ShapeNet
 from torch_geometric.loader import DataLoader
 
+import wandb
 import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_only
 from pytorch_lightning.loggers import WandbLogger
@@ -34,8 +35,8 @@ if __name__ == "__main__":
     parser.add_argument('--temperature', default=0.05, type=float, help='rescale softmax value used in the hyphc loss')
     parser.add_argument('--annealing', default=1.0, type=float, help='annealing factor')
     parser.add_argument('--anneal_step', default=0, type=int, help='use annealing each n step')
-    parser.add_argument('--batch', default=5, type=int, help='batch size')
-    parser.add_argument('--epochs', default=10, type=int, help='number of epochs')
+    parser.add_argument('--batch', default=1, type=int, help='batch size')
+    parser.add_argument('--epochs', default=1, type=int, help='number of epochs')
     parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
     parser.add_argument('--patience', default=50, type=int, help='patience value for early stopping')
     parser.add_argument('--plot', default=-1, type=int, help='interval in which we plot prediction on validation batch')
@@ -111,8 +112,6 @@ if __name__ == "__main__":
 
     nn_emb = EulerFeatExtract(in_channels=hidden, hidden_features=hidden, dropout=dropout, negative_slope=negative_slope) if embedder else None
 
-    # nn_emb = MLP([hidden, hidden, 2], dropout=dropout, negative_slope=negative_slope) if embedder else None
-
     model = SimilarityHypHC(nn=nn,
                             embedder=nn_emb,
                             sim_distance=distance,
@@ -123,7 +122,7 @@ if __name__ == "__main__":
                             plot_every=plot_every)
 
     # logger = MyTensorBoardLogger(logdir, name=dataname)
-    logger = WandbLogger(name=dataname, save_dir=os.path.join(logdir, "HPCS"), project="HPCS")
+    logger = WandbLogger(name=dataname, save_dir=os.path.join(logdir), project="HPCS")
     model_params = {'dataset': dataname,
                     'model': model_name,
                     'k': k if model_name == 'dgcnn' else -1,
@@ -165,8 +164,8 @@ if __name__ == "__main__":
                          max_epochs=epochs,
                          callbacks=[early_stop_callback, checkpoint_callback],
                          logger=logger,
-                         # limit_train_batches=2,
-                         # limit_test_batches=2,
+                         limit_train_batches=2,
+                         limit_test_batches=2,
                          # track_grad_norm=2
                          )
 
@@ -174,5 +173,8 @@ if __name__ == "__main__":
     trainer.fit(model, train_loader, valid_loader)
 
     print("End Training")
+
+    trainer.save_checkpoint(os.path.join(savedir, 'model.h5'))
+    wandb.save('model.h5')
 
     results = trainer.test(model, test_loader)
