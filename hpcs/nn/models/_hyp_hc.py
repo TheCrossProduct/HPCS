@@ -204,9 +204,8 @@ class SimilarityHypHC(pl.LightningModule):
             print("Temperature Value: ", self.temperature)
 
     def validation_step(self, data, batch_idx):
-        #maybe_plot = self.plot_interval > 0 and ((self.current_epoch + 1) % self.plot_interval == 0)
-        maybe_plot = False
-        x, val_loss_triplet, val_loss_hyphc, linkage_matrix = self._forward(data, decode=False)
+        maybe_plot = self.plot_interval > 0 and ((self.current_epoch + 1) % self.plot_interval == 0)
+        x, val_loss_triplet, val_loss_hyphc, linkage_matrix = self._forward(data, decode=maybe_plot)
         val_loss = val_loss_triplet + val_loss_hyphc
 
         fig = None
@@ -216,15 +215,13 @@ class SimilarityHypHC(pl.LightningModule):
             y_pred, k, best_ri = get_optimal_k(data.y.detach().cpu().numpy(), linkage_matrix[0])
             pu_score, nmi_score, ri_score = eval_clustering(y_true=data.y.detach().cpu(), Z=linkage_matrix[0])
 
-            fig = plot_hyperbolic_eval(x=data.x.detach().cpu(),
+            fig = plot_hyperbolic_eval(x=data.pos.detach().cpu(),
                                        y=data.y.detach().cpu(),
-                                       labels=data.labels.detach().cpu(),
                                        y_pred=y_pred,
                                        emb=self.triplet_loss._rescale_emb(x).detach().cpu(),
                                        linkage_matrix=linkage_matrix[0],
-                                       emb_scale=self.rescale.item(),
                                        k=k,
-                                       show=False)
+                                       show=True)
 
             # self.logger.experiment.add_scalar("RandScore/Validation", best_ri, self.plot_step)
             # # self.logger.experiment.add_scalar("AccScore@k/Validation", acc_score, self.plot_step)
@@ -256,19 +253,17 @@ class SimilarityHypHC(pl.LightningModule):
         y_pred_k, k, best_ri = get_optimal_k(data.y.detach().cpu().numpy(), linkage_matrix[0])
         pu_score, nmi_score, ri_score = eval_clustering(y_true=data.y.detach().cpu(), Z=linkage_matrix[0])
 
-        # fig = plot_hyperbolic_eval(x=data.x.detach().cpu(),
-        #                            y=data.y.detach().cpu(),
-        #                            labels=data.labels.detach().cpu(),
-        #                            y_pred=y_pred_k,
-        #                            emb=self.triplet_loss._rescale_emb(x).detach().cpu(),
-        #                            linkage_matrix=linkage_matrix[0],
-        #                            emb_scale=self.rescale.item(),
-        #                            k=k,
-        #                            show=False)
+        plot_hyperbolic_eval(x=data.pos.detach().cpu(),
+                                   y=data.y.detach().cpu(),
+                                   y_pred=y_pred_k,
+                                   emb=self.triplet_loss._rescale_emb(x).detach().cpu(),
+                                   linkage_matrix=linkage_matrix[0],
+                                   k=k,
+                                   show=True)
 
-        # n_clusters = data.y.max() + 1
-        # y_pred = fcluster(linkage_matrix[0], n_clusters, criterion='maxclust') - 1
-        # ri_score = ri(data.y.detach().cpu().numpy(), y_pred)
+        n_clusters = data.y.max() + 1
+        y_pred = fcluster(linkage_matrix[0], n_clusters, criterion='maxclust') - 1
+        ri_score = ri(data.y.detach().cpu().numpy(), y_pred)
 
         # self.logger.experiment.add_scalar("Loss/Test", test_loss, batch_idx)
         # self.logger.experiment.add_scalar("RandScore/Test", best_ri, batch_idx)
@@ -311,7 +306,7 @@ class SimilarityHypHC(pl.LightningModule):
                    'ari': avg_ri, 'ari-std': std_ri,
                    'best_k': avg_best_k, 'std_k': std_best_k}
 
-        self.logger.log_metrics(metrics, step=len(outputs))
+        # self.logger.log_metrics(metrics, step=len(outputs))
 
         return {'test_loss': avg_loss,
                 'test_ri': avg_ri,

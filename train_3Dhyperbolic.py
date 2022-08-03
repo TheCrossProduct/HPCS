@@ -34,8 +34,8 @@ if __name__ == "__main__":
     parser.add_argument('--temperature', default=0.05, type=float, help='rescale softmax value used in the hyphc loss')
     parser.add_argument('--annealing', default=1.0, type=float, help='annealing factor')
     parser.add_argument('--anneal_step', default=0, type=int, help='use annealing each n step')
-    parser.add_argument('--batch', default=1, type=int, help='batch size')
-    parser.add_argument('--epochs', default=1, type=int, help='number of epochs')
+    parser.add_argument('--batch', default=5, type=int, help='batch size')
+    parser.add_argument('--epochs', default=10, type=int, help='number of epochs')
     parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
     parser.add_argument('--patience', default=50, type=int, help='patience value for early stopping')
     parser.add_argument('--plot', default=-1, type=int, help='interval in which we plot prediction on validation batch')
@@ -80,7 +80,7 @@ if __name__ == "__main__":
     test_dataset = ShapeNet(path, category, split='test', transform=transform, pre_transform=pre_transform)
 
     train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers)
-    valid_loader = DataLoader(valid_dataset, batch_size=batch, shuffle=False, num_workers=num_workers)
+    valid_loader = DataLoader(valid_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
     test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
 
     if len(args.gpu):
@@ -165,8 +165,8 @@ if __name__ == "__main__":
                          max_epochs=epochs,
                          callbacks=[early_stop_callback, checkpoint_callback],
                          logger=logger,
-                         limit_train_batches=2,
-                         limit_test_batches=2,
+                         # limit_train_batches=2,
+                         # limit_test_batches=2,
                          # track_grad_norm=2
                          )
 
