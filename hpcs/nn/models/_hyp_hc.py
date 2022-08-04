@@ -13,7 +13,7 @@ from torch_geometric.data import Batch
 # from torchmetrics.functional import accuracy
 from sklearn.metrics.cluster import adjusted_rand_score as ri
 
-from hpcs.utils.viz import plot_hyperbolic_eval
+from hpcs.utils.viz import plot_hyperbolic_eval, plot_cloud
 from hpcs.utils.scores import eval_clustering, get_optimal_k
 from hpcs.loss.ultrametric_loss import TripletHyperbolicLoss
 
@@ -235,13 +235,14 @@ class SimilarityHypHC(pl.LightningModule):
         y_pred_k, k, best_ri = get_optimal_k(data.y.detach().cpu().numpy(), linkage_matrix[0])
         pu_score, nmi_score, ri_score = eval_clustering(y_true=data.y.detach().cpu(), Z=linkage_matrix[0])
 
-        fig = plot_hyperbolic_eval(x=data.pos.detach().cpu(),
-                                   y=data.y.detach().cpu(),
-                                   y_pred=y_pred_k,
-                                   emb=self.triplet_loss._rescale_emb(x).detach().cpu(),
-                                   linkage_matrix=linkage_matrix[0],
-                                   k=k,
-                                   show=True)
+        plot_hyperbolic_eval(x=data.pos.detach().cpu(),
+                             y=data.y.detach().cpu(),
+                             y_pred=y_pred_k,
+                             emb_hidden=data.x.detach().cpu(),
+                             emb_poincare=self.triplet_loss._rescale_emb(x).detach().cpu(),
+                             linkage_matrix=linkage_matrix[0],
+                             k=k,
+                             show=True)
 
         n_clusters = data.y.max() + 1
         y_pred = fcluster(linkage_matrix[0], n_clusters, criterion='maxclust') - 1

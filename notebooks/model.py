@@ -94,7 +94,8 @@ def configure(config):
 
 
     trainer = pl.Trainer(gpus=gpu,
-                         max_epochs=epochs
+                         max_epochs=epochs,
+                         limit_test_batches=2,
                          )
 
     return model, trainer

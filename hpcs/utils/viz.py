@@ -251,7 +251,7 @@ def plot_graph(x, edge_index, edge_col):
     ax.scatter(xout[:, 0], xout[:, 1], s=20, c='w', edgecolors='k')
 
 
-def plot_hyperbolic_eval(x, y, emb, linkage_matrix, y_pred=None, k=-1, show=True):
+def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, y_pred=None, k=-1, show=True):
     """
     Auxiliary functions to plot results about hyperbolic clustering
     """
@@ -265,13 +265,15 @@ def plot_hyperbolic_eval(x, y, emb, linkage_matrix, y_pred=None, k=-1, show=True
 
     k_ri_score = ri(y, y_pred)
 
-    if k != n_clusters:
-        y_pred_at_n = fcluster(linkage_matrix, n_clusters, criterion='maxclust') - 1
-        val_ri_score = ri(y, y_pred_at_n)
-        n_plots = 5
-    else:
-        val_ri_score = k_ri_score
-        n_plots = 4
+    # if k != n_clusters:
+    #     y_pred_at_n = fcluster(linkage_matrix, n_clusters, criterion='maxclust') - 1
+    #     val_ri_score = ri(y, y_pred_at_n)
+    #     n_plots = 5
+    # else:
+    #     val_ri_score = k_ri_score
+    #     n_plots = 4
+
+    n_plots = 5
     # plot prediction
     idx = 1
     fig = plt.figure(figsize=(5 * n_plots, 5))
@@ -282,17 +284,22 @@ def plot_hyperbolic_eval(x, y, emb, linkage_matrix, y_pred=None, k=-1, show=True
     ax = plt.subplot(1, n_plots, idx)
     plot_clustering(x, y_pred)
     ax.set_title(f'Pred: RI@{k}: {k_ri_score:.3f}')
-    if k != n_clusters:
-        idx += 1
-        ax = plt.subplot(1, n_plots, idx)
-        plot_clustering(x, y_pred_at_n)
-        ax.set_title(f'Pred {n_clusters}: RI@{n_clusters}: {val_ri_score:.3f}')
+    # if k != n_clusters:
+    #     idx += 1
+    #     ax = plt.subplot(1, n_plots, idx)
+    #     plot_clustering(x, y_pred_at_n)
+    #     ax.set_title(f'Pred {n_clusters}: RI@{n_clusters}: {val_ri_score:.3f}')
 
     idx += 1
     ax = plt.subplot(1, n_plots, idx)
-    plot_clustering(emb, y_pred)
+    plot_clustering(emb_hidden, y_pred)
+    ax.set_title('Encoded Space')
+    idx += 1
+    ax = plt.subplot(1, n_plots, idx)
+    plot_clustering(emb_poincare, y_pred)
     ax.set_xlim(-1 - 1e-1, 1 + 1e-1)
     ax.set_ylim(-1 - 1e-1, 1 + 1e-1)
+    ax.set_title('Poincaré Disk')
     idx += 1
     ax = plt.subplot(1, n_plots, idx)
     plot_dendrogram(linkage_matrix, n_clusters=k)
