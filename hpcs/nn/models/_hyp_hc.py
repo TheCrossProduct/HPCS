@@ -1,3 +1,4 @@
+import wandb
 import torch
 import numpy as np
 import pytorch_lightning as pl
@@ -75,7 +76,6 @@ class SimilarityHypHC(pl.LightningModule):
                                                   temperature=temperature,
                                                   anneal=anneal)
 
-        # learning rate
         self.lr = lr
         self.patience = patience
         self.factor = factor
@@ -117,8 +117,6 @@ class SimilarityHypHC(pl.LightningModule):
             x_feat_samples = x
             y_samples = y
 
-        # loss_triplet, loss_hyphc = self._loss(x_feat_samples=x_feat_samples, y_samples=y_samples,
-        #                                       x_emb_samples=x_emb_samples, t_per_anchor=1000)
         losses = self.triplet_loss.compute_loss(embeddings=x_feat_samples,
                                                 labels=y_samples,
                                                 indices_tuple=None,
@@ -153,22 +151,6 @@ class SimilarityHypHC(pl.LightningModule):
 
         return x, loss_triplet, loss_hyphc, link_mat
 
-    def _get_optimal_k(self, y, linkage_matrix):
-        best_ri = 0.0
-        n_clusters = y.max() + 1
-        # min_num_clusters = max(n_clusters - 1, 1)
-        best_k = 0
-        best_pred = None
-        for k in range(1, n_clusters + 5):
-            y_pred = fcluster(linkage_matrix, k, criterion='maxclust') - 1
-            k_ri = ri(y, y_pred)
-            if k_ri > best_ri:
-                best_ri = k_ri
-                best_k = k
-                best_pred = y_pred
-
-        return best_pred, best_k, best_ri
-
     def configure_optimizers(self):
         optim = RAdam(self.parameters(), lr=self.lr)
         scheduler = [
@@ -187,12 +169,12 @@ class SimilarityHypHC(pl.LightningModule):
     def training_step(self, data, batch_idx):
         x, loss_triplet, loss_hyphc, _ = self._forward(data)
         loss = loss_triplet + loss_hyphc
-        self.log("train_loss", {"total_loss": loss, "triplet_loss": loss_triplet, "hyphc_loss": loss_hyphc}, prog_bar=True)
 
+        self.log("train_loss", {"total_loss": loss, "triplet_loss": loss_triplet, "hyphc_loss": loss_hyphc})
         return {'loss': loss, 'progress_bar': {'triplet': loss_triplet, 'hyphc': loss_hyphc}}
 
     def training_epoch_end(self, outputs):
-        avg_loss = torch.stack([x['loss'] for x in outputs]).mean()
+        # avg_loss = torch.stack([x['loss'] for x in outputs]).mean()
         # avg_ri = torch.stack([x['ri'] for x in outputs]).mean()
         # self.logger.experiment.add_scalar("Loss/Train", avg_loss, self.current_epoch)
         # self.logger.experiment.add_scalar("RandScore/Train", avg_ri, self.current_epoch)
@@ -230,11 +212,11 @@ class SimilarityHypHC(pl.LightningModule):
             # self.logger.experiment.add_scalar("RandScore@k/Validation", ri_score, self.plot_step)
             self.plot_step += 1
 
-        self.log("val_loss", val_loss, batch_size=data.batch.shape[0])
+        self.log("val_loss", val_loss, batch_size=data.batch.shape[0], on_step=False, on_epoch=True)
         return {'val_loss': val_loss, 'figures': fig, 'best_ri': torch.tensor(best_ri)}
 
     def validation_epoch_end(self, outputs):
-        avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
+        # avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
         # self.logger.experiment.add_scalar("Loss/Validation", avg_loss, self.current_epoch)
         # self.logger.log_metrics({'val_loss': avg_loss}, step=self.current_epoch)
 
@@ -243,8 +225,8 @@ class SimilarityHypHC(pl.LightningModule):
         for n, fig in enumerate(figures):
             tag = n // 10
             step = n % 10
-            # self.logger.experiment.add_figure(f"Plots/Validation@Epoch:{self.current_epoch}:{tag}", figure=fig,
-            #                                   global_step=step)
+            self.logger.experiment.add_figure(f"Plots/Validation@Epoch:{self.current_epoch}:{tag}", figure=fig,
+                                              global_step=step)
 
     def test_step(self, data, batch_idx):
         x, test_loss_triplet, test_loss_hyphc, linkage_matrix = self._forward(data, decode=True)
@@ -253,7 +235,7 @@ class SimilarityHypHC(pl.LightningModule):
         y_pred_k, k, best_ri = get_optimal_k(data.y.detach().cpu().numpy(), linkage_matrix[0])
         pu_score, nmi_score, ri_score = eval_clustering(y_true=data.y.detach().cpu(), Z=linkage_matrix[0])
 
-        plot_hyperbolic_eval(x=data.pos.detach().cpu(),
+        fig = plot_hyperbolic_eval(x=data.pos.detach().cpu(),
                                    y=data.y.detach().cpu(),
                                    y_pred=y_pred_k,
                                    emb=self.triplet_loss._rescale_emb(x).detach().cpu(),
@@ -278,7 +260,7 @@ class SimilarityHypHC(pl.LightningModule):
         # self.logger.log_metrics({'ari@k': ri_score, 'purity@k': pu_score, 'nmi@k': nmi_score,
         #                          'ari': best_ri, 'best_k': k}, step=batch_idx)
 
-        self.log("test_loss", test_loss, batch_size=data.batch.shape[0])
+        self.log("test_loss", test_loss, batch_size=data.batch.shape[0], on_step=False, on_epoch=True)
         return {'test_loss': test_loss, 'test_ri@k': torch.tensor(ri_score),
                 'test_pu@k': torch.tensor(pu_score), 'test_nmi@k': torch.tensor(nmi_score),
                 'test_ri': torch.tensor(best_ri), 'k': torch.tensor(k, dtype=torch.float)}
@@ -314,292 +296,3 @@ class SimilarityHypHC(pl.LightningModule):
                 # 'acc@k': avg_acc_k, 'acc@k-std': std_acc_k,
                 'purity@k': avg_pu_k, 'purity@k-std': std_pu_k,
                 'nmi@k': avg_nmi_k, 'nmi@k-std': std_nmi_k}
-
-
-# DEPRECATED CLASS
-# class HyperbolicSeg(pl.LightningModule):
-#     def __init__(self, k: int, hidden_feat: int, num_classes: int, transform: bool = False, aggr='max',
-#                  dropout=0.3, negative_slope=0.2,
-#                  sim_distance: str = 'cosine', t_per_anchor=100, label_ratio=0.3,
-#                  temperature: float = 0.05, margin: float = 1.0, init_rescale: float = 1e-3,
-#                  max_scale: float = 1. - 1e-3, lr: float = 1e-3, patience: int = 10,
-#                  factor: float = 0.5, min_lr: float = 1e-4, weight_decay=1e-4):
-#
-#         super(HyperbolicSeg, self).__init__()
-#         self.num_classes = num_classes
-#         # dgcnn model
-#         self.transform = transform
-#         if self.transform:
-#             self.tnet = TransformNet()
-#
-#         self.conv1 = DynamicEdgeConv(
-#             nn=MLP([2 * 3, hidden_feat, hidden_feat], negative_slope=negative_slope),
-#             k=k,
-#             aggr=aggr
-#         )
-#         self.conv2 = DynamicEdgeConv(
-#             nn=MLP([2 * hidden_feat, hidden_feat, hidden_feat], negative_slope=negative_slope),
-#             k=k,
-#             aggr=aggr
-#         )
-#         self.conv3 = DynamicEdgeConv(
-#             nn=MLP([2 * hidden_feat, hidden_feat, hidden_feat], negative_slope=negative_slope),
-#             k=k,
-#             aggr=aggr
-#         )
-#
-#         # used to embedd hidden features to poincare disk
-#         self.embedder = MLP([hidden_feat, hidden_feat, hidden_feat, 2], negative_slope=negative_slope)
-#         self.lin1 = MLP([3 * hidden_feat, 1024], bias=False, negative_slope=negative_slope)
-#
-#         self.mlp = Seq(
-#             MLP([1024, 256], negative_slope=0.2),
-#             Dropout(dropout),
-#             MLP([256, 128], negative_slope=0.2),
-#             Dropout(dropout),
-#             Linear(128, num_classes)
-#         )
-#         # parameters for the triplet loss term
-#         self.t_per_anchor = t_per_anchor
-#         self.label_ratio = label_ratio
-#         self.margin = margin
-#
-#         # parameters for hyperbolic disk projection
-#         self.rescale = torch.nn.Parameter(torch.Tensor([init_rescale]), requires_grad=True)
-#         self.max_scale = max_scale
-#         self.temperature = temperature
-#         # least common ancestor on hyperbolic disk
-#         self.distance_lca = HyperbolicLCA()
-#
-#         if sim_distance == 'cosine':
-#             self.distace_sim = distances.CosineSimilarity()
-#             self.loss_triplet_sim = losses.TripletMarginLoss(distance=self.distace_sim, margin=self.margin)
-#         elif sim_distance == 'euclidean':
-#             self.distace_sim = distances.LpDistance()
-#             self.loss_triplet_sim = losses.TripletMarginLoss(distance=self.distace_sim, margin=self.margin,
-#                                                              embedding_regularizer=regularizers.LpRegularizer())
-#         else:
-#             raise ValueError(
-#                 f"The option {sim_distance} is not available for sim_distance. The only available are ['cosine', 'euclidean'].")
-#
-#         # parameters for optimizers
-#         self.lr = lr
-#         self.factor = factor
-#         self.patience = patience
-#         self.min_lr = min_lr
-#         self.weight_decay = weight_decay
-#
-#         # parameter to control manual optimization
-#         self.automatic_optimization = False
-#
-#     def configure_optimizers(self):
-#
-#         optim_adam = Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
-#
-#         optim_radam = RAdam(self.parameters(), lr=self.lr)
-#
-#         optimizers = [optim_adam, optim_radam]
-#         schedulers = [
-#             {
-#                 'scheduler': lr_scheduler.ReduceLROnPlateau(optimizers[1], mode='min', factor=0.5, patience=10,
-#                                                             min_lr=1e-4, verbose=True),
-#                 'monitor': 'val_loss',
-#                 'interval': 'epoch',
-#                 'frequency': 1,
-#                 'strict': True,
-#             },
-#             lr_scheduler.StepLR(optimizers[0], step_size=20, gamma=0.5)
-#         ]
-#
-#         return optimizers, schedulers
-#
-#     def _rescale_emb(self, embeddings):
-#         """Normalize leaves embeddings to have the lie on a diameter."""
-#         min_scale = 1e-4  # self.init_size
-#         max_scale = self.max_scale
-#         return F.normalize(embeddings, p=2, dim=1) * self.rescale.clamp_min(min_scale).clamp_max(max_scale)
-#
-#     def _loss(self, x_feat_samples, y_samples, x_emb_samples, t_per_anchor=100):
-#         # indices_tuple = lmu.convert_to_triplets(None, y_samples, t_per_anchor='all')
-#         indices_tuple = lmu.convert_to_triplets(None, y_samples, t_per_anchor=t_per_anchor)
-#
-#         anchor_idx, positive_idx, negative_idx = indices_tuple
-#         # print("Len Anchor: ", len(anchor_idx))
-#         if len(anchor_idx) == 0:
-#             loss_triplet_sim = self.loss_triplet_sim(x_feat_samples, y_samples)
-#             loss_triplet_lca = torch.tensor([0.0], device=loss_triplet_sim.device)
-#             # raise ValueError("Anchor idx is empty ")
-#             return loss_triplet_lca, loss_triplet_sim
-#         # #
-#         if isinstance(self.distace_sim, distances.CosineSimilarity):
-#             mat_sim = 0.5 * (1 + self.distace_sim(x_feat_samples))
-#         else:
-#             # mat_sim = 0.5 * (1 + self.distace_sim(project(x_emb_samples)))
-#             mat_sim = torch.exp(-self.distace_sim(x_feat_samples))
-#             # print("euclidean", mat_sim.max(), mat_sim.min())
-#         #
-#         # mat_sim = self.distace_sim(x_feat_samples)
-#         mat_lca = self.distance_lca(self._rescale_emb(x_emb_samples))
-#         # print(f"sim values: max {mat_sim.max()}, min: {mat_sim.min()}")
-#         wij = mat_sim[anchor_idx, positive_idx]
-#         wik = mat_sim[anchor_idx, negative_idx]
-#         wjk = mat_sim[positive_idx, negative_idx]
-#
-#         dij = mat_lca[anchor_idx, positive_idx]
-#         dik = mat_lca[anchor_idx, negative_idx]
-#         djk = mat_lca[positive_idx, negative_idx]
-#
-#         # loss proposed by Chami et al.
-#         sim_triplet = torch.stack([wij, wik, wjk]).T
-#         lca_triplet = torch.stack([dij, dik, djk]).T
-#         weights = torch.softmax(lca_triplet / self.temperature, dim=-1)
-#
-#         w_ord = torch.sum(sim_triplet * weights, dim=-1, keepdim=True)
-#         total = torch.sum(sim_triplet, dim=-1, keepdim=True) - w_ord
-#         loss_triplet_lca = torch.mean(total) + mat_sim.mean()
-#
-#         loss_triplet_sim = self.loss_triplet_sim(x_feat_samples, y_samples)
-#
-#         return loss_triplet_sim, loss_triplet_lca
-#
-#     def forward(self, x, y, batch=None, labels=None):
-#
-#         if self.transform:
-#             tr = self.tnet(x, batch=batch)
-#
-#             if batch is None:
-#                 x = torch.matmul(x, tr[0])
-#             else:
-#                 batch_size = batch.max().item() + 1
-#                 x = torch.cat([torch.matmul(x[batch == i], tr[i]) for i in range(batch_size)])
-#
-#         # feature extractor
-#         x1 = self.conv1(x, batch)
-#         x2 = self.conv2(x1, batch)
-#         x3 = self.conv3(x2, batch)
-#
-#         if labels is not None:
-#             # if labels we compute hyperbolic loss
-#             x_emb = self.embedder(x3)
-#             x_feat_samples = x3[labels]
-#             x_emb_samples = x_emb[labels]
-#             y_samples = y[labels]
-#
-#             loss_triplet, loss_hyphc = self._loss(x_feat_samples=x_feat_samples, y_samples=y_samples,
-#                                                   x_emb_samples=x_emb_samples, t_per_anchor=self.t_per_anchor)
-#             return x_emb, loss_triplet, loss_hyphc
-#         else:
-#
-#             out = self.lin1(torch.cat([x1, x2, x3], dim=1))
-#             out = self.mlp(out)
-#
-#             return F.log_softmax(out, dim=-1)
-#
-#     def step(self, data, compute_hier_loss=False):
-#         if isinstance(data, list):
-#             data = Batch.from_data_list(data, follow_batch=[]).to(self.device)
-#
-#         y = data.y
-#         x = data.pos
-#         batch = data.batch
-#         if compute_hier_loss:
-#             classes = torch.unique(y)
-#             labels = torch.zeros(x.size(0), dtype=torch.bool)
-#             for c in classes:
-#                 # picking at least one label per class
-#                 p = torch.zeros(x.size(0))
-#                 p[y == c] = 1
-#                 num_labels = max(int(p.sum() * self.label_ratio), 1)
-#                 idx = p.multinomial(num_samples=num_labels, replacement=False)
-#                 labels[idx] = True
-#
-#             labels = labels.to(x.device)
-#
-#             # labels = torch.rand_like(x[:,0]) <= self.label_ratio
-#             x_emb, loss_triplet, loss_hyphc = self(x=x, y=y, batch=batch, labels=labels)
-#
-#             return x_emb, loss_triplet, loss_hyphc
-#         else:
-#             y_hat = self(x=x, y=y, batch=batch)
-#             loss = F.nll_loss(y_hat, y)
-#
-#             _, y_pred = y_hat.max(dim=1)
-#             acc_score = accuracy(y_pred, y, num_classes=self.num_classes)
-#             iou_score = iou(y_pred, y, num_classes=self.num_classes)
-#
-#             return loss, acc_score, iou_score
-#
-#     def training_step(self, data, batch_idx, optimizer_idx):
-#         # manual
-#         (opt_adam, opt_radam) = self.optimizers()
-#
-#         loss, acc_score, iou_score = self.step(data, compute_hier_loss=False)
-#
-#         self.log('loss', loss, on_step=False, on_epoch=True, prog_bar=False, logger=True)
-#         self.log('acc', acc_score, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-#
-#         # make sure there are no grads
-#         # if batch_idx > 0:
-#         #     assert torch.all(self.layer.weight.grad == 0)
-#
-#         self.manual_backward(loss, opt_adam)
-#         opt_adam.step()
-#         opt_adam.zero_grad()
-#         # assert torch.all(self.layer.weight.grad == 0)
-#
-#         # hyphc
-#         x_emb, loss_triplet, loss_hyphc = self.step(data, compute_hier_loss=True)
-#         loss_hc = loss_triplet + loss_hyphc
-#         self.log('loss_triplet', loss_triplet, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-#         self.log('loss_hyphc', loss_hyphc, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-#
-#         # ensure we forward the correct params to the optimizer
-#         # without retain_graph we can't do multiple backward passes
-#         self.manual_backward(loss_hc, opt_radam, retain_graph=True)
-#         self.manual_backward(loss_hc, opt_adam, retain_graph=True)
-#
-#         opt_radam.step()
-#         opt_radam.zero_grad()
-#
-#         # return {'loss': loss, 'loss_triplet': loss_triplet, 'loss_hyphc': loss_hyphc, 'acc': acc_score, 'iou': iou_score}
-#
-#     def training_epoch_end(self, outputs):
-#         self.epoch_end(outputs)
-#
-#     def epoch_end(self, outputs):
-#         """
-#         Run at epoch end for training or validation. Can be overriden in models.
-#         """
-#         return outputs
-#
-#     def validation_step(self, data, batch_idx):
-#
-#         val_loss, val_acc_score, val_iou_score = self.step(data, compute_hier_loss=False)
-#         x_emb, val_loss_triplet, val_loss_hyphc = self.step(data, compute_hier_loss=True)
-#         self.log('val_loss', val_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-#         self.log('val_loss_triplet', val_loss_triplet, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-#         self.log('val_loss_hyphc', val_loss_hyphc, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-#         self.log('val_acc', val_acc_score, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-#         self.log('val_iou', val_iou_score, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-#
-#         # return {'val_loss': val_loss, 'val_loss_triplet': val_loss_triplet, 'val_loss_hyphc': val_loss_hyphc,
-#         #         'val_acc': val_acc_score, 'val_iou': val_iou_score}
-#
-#     def validation_epoch_end(self, outputs):
-#         self.epoch_end(outputs)
-#
-#     def test_step(self, data, batch_idx):
-#         test_loss, test_acc_score, test_iou_score = self.step(data, compute_hier_loss=False)
-#         x_emb, test_loss_triplet, test_loss_hyphc = self.step(data, compute_hier_loss=True)
-#
-#         self.log('test_loss', test_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-#         self.log('test_loss_triplet', test_loss_triplet, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-#         self.log('test_loss_hyphc', test_loss_hyphc, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-#         self.log('test_acc', test_acc_score, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-#         self.log('test_iou', test_iou_score, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-#
-#         # return {'test_loss': test_loss,
-#         #         'test_acc': test_acc_score, 'test_iou': test_iou_score}
-#
-#     def test_epoch_end(self, outputs):
-#         self.epoch_end(outputs)
