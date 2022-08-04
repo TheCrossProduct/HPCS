@@ -165,8 +165,8 @@ def train(model, trainer, train_loader, valid_loader, test_loader, savedir):
 
     print("End Training")
 
-    trainer.save_checkpoint('model.h5')
-    wandb.save('model.h5')
+    trainer.save_checkpoint('model.ckpt')
+    wandb.save('model.ckpt')
 
     trainer.test(model, test_loader)
 
