@@ -1,0 +1,14 @@
+program: train.py
+method: bayes
+metric:
+  goal: minimize
+  name: val_loss
+parameters:
+  batch:
+    values: [1]
+  epochs:
+    values: [1]
+  lr:
+    values: [1e-3]
+  fixed_points:
+    values: [150]
