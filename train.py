@@ -23,7 +23,7 @@ def sweep():
     with wandb.init():
         config = wandb.config
         model, trainer, train_loader, valid_loader, test_loader, savedir = configure(config)
-        train(model, trainer, train_loader, valid_loader, test_loader, savedir)
+        train(model, trainer, train_loader, valid_loader, test_loader)
 
 
 def configure(config):
@@ -48,7 +48,7 @@ def configure(config):
     parser.add_argument('--lr', default=config.lr, type=float, help='learning rate')
     parser.add_argument('--patience', default=50, type=int, help='patience value for early stopping')
     parser.add_argument('--plot', default=-1, type=int, help='interval in which we plot prediction on validation batch')
-    parser.add_argument('--gpu', default="", type=str, help='use gpu')
+    parser.add_argument('--gpu', default="0", type=str, help='use gpu')
     parser.add_argument('--distributed', help='if True run on a cluster machine', action='store_true')
     parser.add_argument('--num_workers', type=int, default=6)
     parser.add_argument('--fixed_points', type=int, default=config.fixed_points)
@@ -133,9 +133,10 @@ def configure(config):
                     'temperature': temperature,
                     'annealing': annealing,
                     'anneal_step': anneal_step,
-                    'max_epochs': epochs,
+                    'epochs': epochs,
                     'batch': batch,
-                    'lr': lr}
+                    'lr': lr,
+                    'fixed_points': fixed_points}
     print(model_params)
 
     savedir = os.path.join(logger.save_dir, logger.name, 'version_' + str(logger.version), 'checkpoints')
@@ -151,15 +152,15 @@ def configure(config):
                          max_epochs=epochs,
                          callbacks=[early_stop_callback, checkpoint_callback],
                          logger=logger,
-                         limit_train_batches=2,
-                         limit_test_batches=2,
+                         # limit_train_batches=2,
+                         # limit_test_batches=2,
                          # track_grad_norm=2
                          )
 
     return model, trainer, train_loader, valid_loader, test_loader, savedir
 
 
-def train(model, trainer, train_loader, valid_loader, test_loader, savedir):
+def train(model, trainer, train_loader, valid_loader, test_loader):
 
     trainer.fit(model, train_loader, valid_loader)
 
@@ -176,6 +177,6 @@ if __name__ == "__main__":
     with open(r'sweeps/sweep.yaml') as file:
         sweep_config = yaml.load(file, Loader=yaml.FullLoader)
 
-    # sweep_id = wandb.sweep(sweep_config, project="HPCS")
-    sweep_id = 'v7hcnyap'
+    sweep_id = wandb.sweep(sweep_config, project="HPCS")
+    # sweep_id = 'v7hcnyap'
     wandb.agent(sweep_id, function=sweep, count=1, project="HPCS")

@@ -5,10 +5,10 @@ metric:
   name: val_loss
 parameters:
   batch:
-    value: [1]
+    values: [5]
   epochs:
-    value: [1]
+    values: [15]
   lr:
-    value: [1e-3]
+    values: [1e-3]
   fixed_points:
-    value: [150]
+    values: [150]
