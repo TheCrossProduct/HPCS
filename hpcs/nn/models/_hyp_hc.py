@@ -60,7 +60,7 @@ class SimilarityHypHC(pl.LightningModule):
             plot validation value every #plot_every epoch
 
     """
-    def __init__(self, nn: torch.nn.Module, min_scale: float = 1e-4,
+    def __init__(self, nn: torch.nn.Module, min_scale: float = 1e-2,
                  sim_distance: str = 'cosine', temperature: float = 0.05, anneal: float = 0.5, anneal_step: int = 0,
                  margin: float = 1.0, init_rescale: float = 1e-3, max_scale: float = 1. - 1e-3, lr: float = 1e-3,
                  patience: int = 10, factor: float = 0.5, min_lr: float = 1e-4,
@@ -242,6 +242,8 @@ class SimilarityHypHC(pl.LightningModule):
 
         n_clusters = data.y.max() + 1
         y_pred = fcluster(linkage_matrix[0], n_clusters, criterion='maxclust') - 1
+        # predictions = []
+        # predictions = predictions.append(y_pred)
         ri_score = ri(data.y.detach().cpu().numpy(), y_pred)
 
         # self.logger.experiment.add_scalar("Loss/Test", test_loss, batch_idx)

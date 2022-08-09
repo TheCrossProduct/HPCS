@@ -9,7 +9,7 @@ from typing import Union
 
 class TripletHyperbolicLoss(BaseMetricLossFunction):
     def __init__(self, sim_distance: str = 'cosine', margin: float = 1.0, init_rescale: float = 1e-3,
-                 min_scale: float = 1e-4 , max_scale: float = 1. - 1e-3,
+                 min_scale: float = 1e-2, max_scale: float = 1. - 1e-3,
                  temperature: float = 0.05, anneal: float = 0.5):
         super(TripletHyperbolicLoss, self).__init__()
         # Triplet Loss on similarities between embeddings
@@ -30,7 +30,6 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
         self.margin = margin
 
         self.rescale = torch.nn.Parameter(torch.Tensor([init_rescale]), requires_grad=True)
-        print(min_scale)
         self.min_scale = min_scale
         self.max_scale = max_scale
         self.temperature = temperature
@@ -45,7 +44,7 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
         # TODO: review this function
         max_temp = 0.8
         min_temp = 0.01
-        self.temperature = self.temperature = max(min(self.temperature * self.anneal, max_temp), min_temp)
+        self.temperature = max(min(self.temperature * self.anneal, max_temp), min_temp)
     def _rescale_emb(self, embeddings):
         """Normalize leaves embeddings to have the lie on a diameter."""
         min_scale = self.min_scale # self.init_size
@@ -55,7 +54,16 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
     def compute_loss(self, embeddings, labels, indices_tuple, ref_emb, ref_labels, t_per_anchor = 100):
         indices_tuple = lmu.convert_to_triplets(None, labels, t_per_anchor=t_per_anchor)
 
-        anchor_idx, positive_idx, negative_idx = indices_tuple
+        points = torch.arange(0, len(labels))
+        duplets = torch.combinations(points, r=2)
+        random = torch.randint(0, 150, (len(duplets), 1))
+        triplets = torch.cat((duplets, random), dim=-1)
+        for i, x in enumerate(triplets):
+            if len(torch.unique(x)) != 3:
+                triplets = triplets[torch.arange(triplets.size(0)) != i]
+        triplet = torch.unbind(triplets, dim=1)
+
+        anchor_idx, positive_idx, negative_idx = triplet
         if len(anchor_idx) == 0:
             return self.zero_losses()
 

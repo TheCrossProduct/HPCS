@@ -47,7 +47,7 @@ def configure(config):
     parser.add_argument('--lr', default=config.lr, type=float, help='learning rate')
     parser.add_argument('--patience', default=50, type=int, help='patience value for early stopping')
     parser.add_argument('--plot', default=-1, type=int, help='interval in which we plot prediction on validation batch')
-    parser.add_argument('--gpu', default="0", type=str, help='use gpu')
+    parser.add_argument('--gpu', default="", type=str, help='use gpu')
     parser.add_argument('--distributed', help='if True run on a cluster machine', action='store_true')
     parser.add_argument('--num_workers', type=int, default=6)
     parser.add_argument('--fixed_points', type=int, default=config.fixed_points)
@@ -85,9 +85,9 @@ def configure(config):
     train_dataset = ShapeNet(path, category, split='train', transform=transform, pre_transform=pre_transform)
     valid_dataset = ShapeNet(path, category, split='val', transform=transform, pre_transform=pre_transform)
     test_dataset = ShapeNet(path, category, split='test', transform=transform, pre_transform=pre_transform)
-    train_dataset = train_dataset[0:300]
-    valid_dataset = valid_dataset[0:50]
-    test_dataset = test_dataset[0:10]
+    train_dataset = train_dataset[0:20]
+    valid_dataset = valid_dataset[0:5]
+    test_dataset = test_dataset[0:5]
 
     train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers)
     valid_loader = DataLoader(valid_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
@@ -167,6 +167,9 @@ def configure(config):
 
 def train(model, trainer, train_loader, valid_loader, test_loader):
 
+    if os.path.exists('model.ckpt'):
+        os.remove('model.ckpt')
+
     trainer.fit(model, train_loader, valid_loader)
 
     print("End Training")
@@ -187,11 +190,11 @@ if __name__ == "__main__":
     # wandb.agent(sweep_id, function=sweep, count=1, project="HPCS")
 
     config = dict(
-        batch=2,
-        epochs=30,
-        lr=0.0005,
-        fixed_points=200,
-        min_scale=0.1,
+        batch=1,
+        epochs=1,
+        lr=0.001,
+        fixed_points=150,
+        min_scale=0.01,
         architecture="DGCNN",
         dataset_id="shapenet",
     )
