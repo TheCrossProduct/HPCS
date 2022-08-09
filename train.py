@@ -13,17 +13,17 @@ from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
 from hpcs.nn.models._hyp_hc import SimilarityHypHC
+from hpcs.nn.models.encoders.dgcnn import DGCNN
 from hpcs.nn.models.encoders.dgcnn2 import DGCNN2
-from hpcs.nn.models.encoders.euler import EulerFeatExtract
 from hpcs.nn.models.encoders.point_transformer import PointTransformer
 from hpcs.nn.models.encoders.pointnet2 import PointNet2
 
 
-def sweep():
-    with wandb.init():
-        config = wandb.config
-        model, trainer, train_loader, valid_loader, test_loader, savedir = configure(config)
-        train(model, trainer, train_loader, valid_loader, test_loader)
+# def sweep():
+#     with wandb.init():
+#         config = wandb.config
+#         model, trainer, train_loader, valid_loader, test_loader, savedir = configure(config)
+#         train(model, trainer, train_loader, valid_loader, test_loader)
 
 
 def configure(config):
@@ -31,8 +31,7 @@ def configure(config):
     parser = argparse.ArgumentParser()
     parser.add_argument('--logdir', default='logs', type=str, help='dirname for logs')
     parser.add_argument('--data', default='shapenet', type=str, help='name of dataset to use')
-    parser.add_argument('--model', default='dgcnn2', type=str, help='model to use to extract features')
-    parser.add_argument('--embedder', help='if True add a an embedding model from the feature space to B2', action='store_true')
+    parser.add_argument('--model', default='dgcnn', type=str, help='model to use to extract features')
     parser.add_argument('--k', default=10, type=int, help='if model dgcnn, k is the number of neigh to take into account')
     parser.add_argument('--hidden', default=64, type=int, help='number of hidden features')
     parser.add_argument('--negative_slope', default=0.2, type=float, help='negative slope for leaky relu in the feature extractor')
@@ -52,6 +51,7 @@ def configure(config):
     parser.add_argument('--distributed', help='if True run on a cluster machine', action='store_true')
     parser.add_argument('--num_workers', type=int, default=6)
     parser.add_argument('--fixed_points', type=int, default=config.fixed_points)
+    parser.add_argument('--min_scale', type=int, default=config.min_scale)
 
     args = parser.parse_args()
 
@@ -59,7 +59,6 @@ def configure(config):
     dataname = args.data
     epochs = args.epochs
     model_name = args.model
-    embedder = args.embedder
     k = args.k
     hidden = args.hidden
     negative_slope = args.negative_slope
@@ -77,6 +76,7 @@ def configure(config):
     distr = args.distributed
     num_workers = args.num_workers
     fixed_points = args.fixed_points
+    min_scale = args.min_scale
 
     category = 'Airplane'  # Pass in `None` to train on all categories.
     path = osp.join(osp.dirname(osp.realpath(__file__)), 'data', 'ShapeNet')
@@ -85,6 +85,9 @@ def configure(config):
     train_dataset = ShapeNet(path, category, split='train', transform=transform, pre_transform=pre_transform)
     valid_dataset = ShapeNet(path, category, split='val', transform=transform, pre_transform=pre_transform)
     test_dataset = ShapeNet(path, category, split='test', transform=transform, pre_transform=pre_transform)
+    train_dataset = train_dataset[0:300]
+    valid_dataset = valid_dataset[0:50]
+    test_dataset = test_dataset[0:10]
 
     train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers)
     valid_loader = DataLoader(valid_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
@@ -101,18 +104,19 @@ def configure(config):
 
     out_features = 2
     # todo parametrize this
-    if model_name == 'dgcnn2':
-        nn = DGCNN2(in_channels=6, out_channels=out_features, k=30)
+    if model_name == 'dgcnn':
+        nn = DGCNN(in_channels=3, hidden_features=hidden, out_features=out_features, k=k, transformer=False,
+                   dropout=dropout, negative_slope=negative_slope, cosine=cosine)
+    elif model_name == 'dgcnn2':
+        nn = DGCNN2(in_channels=3, out_channels=out_features, k=30)
     elif model_name == 'point_transformer':
         nn = PointTransformer(in_channels=3, out_channels=out_features, dim_model=[32, 64, 128, 256, 512], k=30)
     elif model_name == 'pointnet2':
         nn = PointNet2(in_channels=6, out_channels=out_features)
 
-    nn_emb = EulerFeatExtract(in_channels=hidden, hidden_features=hidden, dropout=dropout,
-                              negative_slope=negative_slope) if embedder else None
 
     model = SimilarityHypHC(nn=nn,
-                            embedder=nn_emb,
+                            min_scale=min_scale,
                             sim_distance=distance,
                             margin=margin,
                             temperature=temperature,
@@ -136,7 +140,8 @@ def configure(config):
                     'epochs': epochs,
                     'batch': batch,
                     'lr': lr,
-                    'fixed_points': fixed_points}
+                    'fixed_points': fixed_points,
+                    'min_scale': min_scale}
     print(model_params)
 
     savedir = os.path.join(logger.save_dir, logger.name, 'version_' + str(logger.version), 'checkpoints')
@@ -152,12 +157,12 @@ def configure(config):
                          max_epochs=epochs,
                          callbacks=[early_stop_callback, checkpoint_callback],
                          logger=logger,
-                         # limit_train_batches=2,
-                         # limit_test_batches=2,
+                         limit_train_batches=4,
+                         limit_test_batches=4,
                          # track_grad_norm=2
                          )
 
-    return model, trainer, train_loader, valid_loader, test_loader, savedir
+    return model, trainer, train_loader, valid_loader, test_loader
 
 
 def train(model, trainer, train_loader, valid_loader, test_loader):
@@ -174,9 +179,24 @@ def train(model, trainer, train_loader, valid_loader, test_loader):
 
 
 if __name__ == "__main__":
-    with open(r'sweeps/sweep.yaml') as file:
-        sweep_config = yaml.load(file, Loader=yaml.FullLoader)
+    # with open(r'sweeps/sweep.yaml') as file:
+    #     sweep_config = yaml.load(file, Loader=yaml.FullLoader)
+    #
+    # sweep_id = wandb.sweep(sweep_config, project="HPCS")
+    # # sweep_id = 'v7hcnyap'
+    # wandb.agent(sweep_id, function=sweep, count=1, project="HPCS")
 
-    sweep_id = wandb.sweep(sweep_config, project="HPCS")
-    # sweep_id = 'v7hcnyap'
-    wandb.agent(sweep_id, function=sweep, count=1, project="HPCS")
+    config = dict(
+        batch=2,
+        epochs=30,
+        lr=0.0005,
+        fixed_points=200,
+        min_scale=0.1,
+        architecture="DGCNN",
+        dataset_id="shapenet",
+    )
+
+    wandb.init(project='HPCS', config=config)
+    config = wandb.config
+    model, trainer, train_loader, valid_loader, test_loader = configure(config)
+    train(model, trainer, train_loader, valid_loader, test_loader)

@@ -3,8 +3,8 @@ import argparse
 import pytorch_lightning as pl
 
 from hpcs.nn.models._hyp_hc import SimilarityHypHC
+from hpcs.nn.models.encoders.dgcnn import DGCNN
 from hpcs.nn.models.encoders.dgcnn2 import DGCNN2
-from hpcs.nn.models.encoders.euler import EulerFeatExtract
 from hpcs.nn.models.encoders.point_transformer import PointTransformer
 from hpcs.nn.models.encoders.pointnet2 import PointNet2
 
@@ -14,8 +14,6 @@ def configure(config):
     parser.add_argument('--logdir', default='logs', type=str, help='dirname for logs')
     parser.add_argument('--data', default='shapenet', type=str, help='name of dataset to use')
     parser.add_argument('--model', default='dgcnn2', type=str, help='model to use to extract features')
-    parser.add_argument('--embedder', help='if True add a an embedding model from the feature space to B2',
-                        action='store_true')
     parser.add_argument('--k', default=10, type=int,
                         help='if model dgcnn, k is the number of neigh to take into account')
     parser.add_argument('--hidden', default=64, type=int, help='number of hidden features')
@@ -44,7 +42,6 @@ def configure(config):
     dataname = args.data
     epochs = args.epochs
     model_name = args.model
-    embedder = args.embedder
     k = args.k
     hidden = args.hidden
     negative_slope = args.negative_slope
@@ -73,18 +70,18 @@ def configure(config):
 
     out_features = 2
     # todo parametrize this
-    if model_name == 'dgcnn2':
-        nn = DGCNN2(in_channels=6, out_channels=out_features, k=30)
+    if model_name == 'dgcnn':
+        nn = DGCNN(in_channels=3, hidden_features=hidden, out_features=out_features, k=k, transformer=False,
+                   dropout=dropout, negative_slope=negative_slope, cosine=cosine)
+    elif model_name == 'dgcnn2':
+        nn = DGCNN2(in_channels=3, out_channels=out_features, k=30)
     elif model_name == 'point_transformer':
         nn = PointTransformer(in_channels=3, out_channels=out_features, dim_model=[32, 64, 128, 256, 512], k=30)
     elif model_name == 'pointnet2':
         nn = PointNet2(in_channels=6, out_channels=out_features)
 
-    nn_emb = EulerFeatExtract(in_channels=hidden, hidden_features=hidden, dropout=dropout,
-                              negative_slope=negative_slope) if embedder else None
 
     model = SimilarityHypHC(nn=nn,
-                            embedder=nn_emb,
                             sim_distance=distance,
                             margin=margin,
                             temperature=temperature,

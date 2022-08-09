@@ -8,7 +8,8 @@ from pytorch_metric_learning.distances import CosineSimilarity, LpDistance
 from typing import Union
 
 class TripletHyperbolicLoss(BaseMetricLossFunction):
-    def __init__(self, sim_distance: str = 'cosine', margin: float = 1.0, init_rescale: float = 1e-3, max_scale: float = 1. - 1e-3,
+    def __init__(self, sim_distance: str = 'cosine', margin: float = 1.0, init_rescale: float = 1e-3,
+                 min_scale: float = 1e-4 , max_scale: float = 1. - 1e-3,
                  temperature: float = 0.05, anneal: float = 0.5):
         super(TripletHyperbolicLoss, self).__init__()
         # Triplet Loss on similarities between embeddings
@@ -29,6 +30,8 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
         self.margin = margin
 
         self.rescale = torch.nn.Parameter(torch.Tensor([init_rescale]), requires_grad=True)
+        print(min_scale)
+        self.min_scale = min_scale
         self.max_scale = max_scale
         self.temperature = temperature
         self.anneal = anneal
@@ -45,7 +48,7 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
         self.temperature = self.temperature = max(min(self.temperature * self.anneal, max_temp), min_temp)
     def _rescale_emb(self, embeddings):
         """Normalize leaves embeddings to have the lie on a diameter."""
-        min_scale = 1e-4  # self.init_size
+        min_scale = self.min_scale # self.init_size
         max_scale = self.max_scale
         return F.normalize(embeddings, p=2, dim=1) * self.rescale.clamp_min(min_scale).clamp_max(max_scale)
 

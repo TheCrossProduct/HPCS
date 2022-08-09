@@ -13,8 +13,8 @@ class DGCNN2(torch.nn.Module):
 
         self.mlp = MLP([3 * 64, 128, out_channels], dropout=0.5, norm=None)
 
-    def forward(self, x, pos, batch=None):
-        x0 = torch.cat([x, pos], dim=-1)
+    def forward(self, pos, batch=None):
+        x0 = pos
         x1 = self.conv1(x0, batch=batch)
         x2 = self.conv2(x1, batch=batch)
         x3 = self.conv3(x2, batch=batch)

@@ -60,18 +60,19 @@ class SimilarityHypHC(pl.LightningModule):
             plot validation value every #plot_every epoch
 
     """
-    def __init__(self, nn: torch.nn.Module, embedder: Union[torch.nn.Module, None],
+    def __init__(self, nn: torch.nn.Module, min_scale: float = 1e-4,
                  sim_distance: str = 'cosine', temperature: float = 0.05, anneal: float = 0.5, anneal_step: int = 0,
                  margin: float = 1.0, init_rescale: float = 1e-3, max_scale: float = 1. - 1e-3, lr: float = 1e-3,
                  patience: int = 10, factor: float = 0.5, min_lr: float = 1e-4,
                  plot_every: int = -1):
         super(SimilarityHypHC, self).__init__()
+        self.save_hyperparameters()
         self.model = nn
-        self.embedder = embedder
 
         self.triplet_loss = TripletHyperbolicLoss(sim_distance=sim_distance,
                                                   margin=margin,
                                                   init_rescale=init_rescale,
+                                                  min_scale=min_scale,
                                                   max_scale=max_scale,
                                                   temperature=temperature,
                                                   anneal=anneal)
@@ -101,20 +102,15 @@ class SimilarityHypHC(pl.LightningModule):
         batch_size = batch.max() + 1
 
         # feature extractor
-        x = self.model(x, pos, batch)
-
-        if isinstance(self.embedder, torch.nn.Module):
-            x_emb = self.embedder(x)
-        else:
-            x_emb = x
+        x_emb = self.model(pos)
 
         linkage_mat = []
 
         if labels is not None:
-            x_feat_samples = x[labels]
+            x_feat_samples = x_emb[labels]
             y_samples = y[labels]
         else:
-            x_feat_samples = x
+            x_feat_samples = x_emb
             y_samples = y
 
         losses = self.triplet_loss.compute_loss(embeddings=x_feat_samples,
@@ -238,7 +234,7 @@ class SimilarityHypHC(pl.LightningModule):
         plot_hyperbolic_eval(x=data.pos.detach().cpu(),
                              y=data.y.detach().cpu(),
                              y_pred=y_pred_k,
-                             emb_hidden=data.x.detach().cpu(),
+                             emb_hidden=x.detach().cpu(),
                              emb_poincare=self.triplet_loss._rescale_emb(x).detach().cpu(),
                              linkage_matrix=linkage_matrix[0],
                              k=k,

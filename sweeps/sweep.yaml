@@ -7,7 +7,7 @@ parameters:
   batch:
     values: [5]
   epochs:
-    values: [15]
+    values: [5]
   lr:
     values: [1e-3]
   fixed_points:

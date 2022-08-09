@@ -297,8 +297,8 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, y_pred=
     idx += 1
     ax = plt.subplot(1, n_plots, idx)
     plot_clustering(emb_poincare, y_pred)
-    ax.set_xlim(-1 - 1e-1, 1 + 1e-1)
-    ax.set_ylim(-1 - 1e-1, 1 + 1e-1)
+    # ax.set_xlim(-1 - 1e-1, 1 + 1e-1)
+    # ax.set_ylim(-1 - 1e-1, 1 + 1e-1)
     ax.set_title('Poincaré Disk')
     idx += 1
     ax = plt.subplot(1, n_plots, idx)
