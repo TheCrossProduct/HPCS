@@ -54,16 +54,16 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
     def compute_loss(self, embeddings, labels, indices_tuple, ref_emb, ref_labels, t_per_anchor = 100):
         indices_tuple = lmu.convert_to_triplets(None, labels, t_per_anchor=t_per_anchor)
 
-        points = torch.arange(0, len(labels))
-        duplets = torch.combinations(points, r=2)
-        random = torch.randint(0, 150, (len(duplets), 1))
-        triplets = torch.cat((duplets, random), dim=-1)
-        for i, x in enumerate(triplets):
-            if len(torch.unique(x)) != 3:
-                triplets = triplets[torch.arange(triplets.size(0)) != i]
-        triplet = torch.unbind(triplets, dim=1)
+        # points = torch.arange(0, len(labels))
+        # duplets = torch.combinations(points, r=2)
+        # random = torch.randint(0, len(labels), (len(duplets), 1))
+        # triplets = torch.cat((duplets, random), dim=-1)
+        # for i, x in enumerate(triplets):
+        #     if len(torch.unique(x)) != 3:
+        #         triplets = triplets[torch.arange(triplets.size(0)) != i]
+        # triplet = torch.unbind(triplets, dim=1)
 
-        anchor_idx, positive_idx, negative_idx = triplet
+        anchor_idx, positive_idx, negative_idx = indices_tuple
         if len(anchor_idx) == 0:
             return self.zero_losses()
 

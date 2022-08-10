@@ -85,9 +85,9 @@ def configure(config):
     train_dataset = ShapeNet(path, category, split='train', transform=transform, pre_transform=pre_transform)
     valid_dataset = ShapeNet(path, category, split='val', transform=transform, pre_transform=pre_transform)
     test_dataset = ShapeNet(path, category, split='test', transform=transform, pre_transform=pre_transform)
-    train_dataset = train_dataset[0:20]
-    valid_dataset = valid_dataset[0:5]
-    test_dataset = test_dataset[0:5]
+    train_dataset = train_dataset[0:100]
+    valid_dataset = valid_dataset[0:20]
+    test_dataset = test_dataset[0:10]
 
     train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers)
     valid_loader = DataLoader(valid_dataset, batch_size=1, shuffle=False, num_workers=num_workers)

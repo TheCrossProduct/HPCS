@@ -240,10 +240,10 @@ class SimilarityHypHC(pl.LightningModule):
                              k=k,
                              show=True)
 
+        plot_cloud(xyz=data.pos.numpy(), scalars=y_pred_k, point_size=3.0, notebook=True)
+
         n_clusters = data.y.max() + 1
         y_pred = fcluster(linkage_matrix[0], n_clusters, criterion='maxclust') - 1
-        # predictions = []
-        # predictions = predictions.append(y_pred)
         ri_score = ri(data.y.detach().cpu().numpy(), y_pred)
 
         # self.logger.experiment.add_scalar("Loss/Test", test_loss, batch_idx)
@@ -259,39 +259,44 @@ class SimilarityHypHC(pl.LightningModule):
         # self.logger.log_metrics({'ari@k': ri_score, 'purity@k': pu_score, 'nmi@k': nmi_score,
         #                          'ari': best_ri, 'best_k': k}, step=batch_idx)
 
+
         self.log("test_loss", test_loss, batch_size=data.batch.shape[0], on_step=False, on_epoch=True)
-        return {'test_loss': test_loss, 'test_ri@k': torch.tensor(ri_score),
-                'test_pu@k': torch.tensor(pu_score), 'test_nmi@k': torch.tensor(nmi_score),
-                'test_ri': torch.tensor(best_ri), 'k': torch.tensor(k, dtype=torch.float)}
+        return {'test_loss': test_loss}
+                # 'test_ri@k': torch.tensor(ri_score),
+                # 'test_pu@k': torch.tensor(pu_score), 'test_nmi@k': torch.tensor(nmi_score),
+                # 'test_ri': torch.tensor(best_ri), 'k': torch.tensor(k, dtype=torch.float)}
 
     def test_epoch_end(self, outputs):
 
         avg_loss = torch.stack([x['test_loss'] for x in outputs]).mean()
-        avg_ri_k = torch.stack([x['test_ri@k'] for x in outputs]).mean()
-        std_ri_k = torch.stack([x['test_ri@k'] for x in outputs]).std()
-        # avg_acc_k = torch.stack([x['test_acc@k'] for x in outputs]).mean()
-        # std_acc_k = torch.stack([x['test_acc@k'] for x in outputs]).std()
-        avg_pu_k = torch.stack([x['test_pu@k'] for x in outputs]).mean()
-        std_pu_k = torch.stack([x['test_pu@k'] for x in outputs]).std()
-        avg_nmi_k = torch.stack([x['test_nmi@k'] for x in outputs]).mean()
-        std_nmi_k = torch.stack([x['test_nmi@k'] for x in outputs]).std()
-        avg_ri = torch.stack([x['test_ri'] for x in outputs]).mean()
-        std_ri = torch.stack([x['test_ri'] for x in outputs]).std()
-        avg_best_k = torch.stack([x['k'] for x in outputs]).mean()
-        std_best_k = torch.stack([x['k'] for x in outputs]).std()
+        # avg_ri_k = torch.stack([x['test_ri@k'] for x in outputs]).mean()
+        # std_ri_k = torch.stack([x['test_ri@k'] for x in outputs]).std()
+        # # avg_acc_k = torch.stack([x['test_acc@k'] for x in outputs]).mean()
+        # # std_acc_k = torch.stack([x['test_acc@k'] for x in outputs]).std()
+        # avg_pu_k = torch.stack([x['test_pu@k'] for x in outputs]).mean()
+        # std_pu_k = torch.stack([x['test_pu@k'] for x in outputs]).std()
+        # avg_nmi_k = torch.stack([x['test_nmi@k'] for x in outputs]).mean()
+        # std_nmi_k = torch.stack([x['test_nmi@k'] for x in outputs]).std()
+        # avg_ri = torch.stack([x['test_ri'] for x in outputs]).mean()
+        # std_ri = torch.stack([x['test_ri'] for x in outputs]).std()
+        # avg_best_k = torch.stack([x['k'] for x in outputs]).mean()
+        # std_best_k = torch.stack([x['k'] for x in outputs]).std()
 
-        metrics = {'ari@k': avg_ri_k, 'ari@k-std': std_ri_k,
-                   # 'acc@k': avg_acc_k, 'acc@k-std': std_acc_k,
-                   'purity@k': avg_pu_k, 'purity@k-std': std_pu_k,
-                   'nmi@k': avg_nmi_k, 'nmi@k-std': std_nmi_k,
-                   'ari': avg_ri, 'ari-std': std_ri,
-                   'best_k': avg_best_k, 'std_k': std_best_k}
+        # predictions = torch.from_numpy(np.stack([x['prediction'] for x in outputs]))
+
+        # metrics = {'ari@k': avg_ri_k, 'ari@k-std': std_ri_k,
+        #            # 'acc@k': avg_acc_k, 'acc@k-std': std_acc_k,
+        #            'purity@k': avg_pu_k, 'purity@k-std': std_pu_k,
+        #            'nmi@k': avg_nmi_k, 'nmi@k-std': std_nmi_k,
+        #            'ari': avg_ri, 'ari-std': std_ri,
+        #            'best_k': avg_best_k, 'std_k': std_best_k}
 
         # self.logger.log_metrics(metrics, step=len(outputs))
 
-        return {'test_loss': avg_loss,
-                'test_ri': avg_ri,
-                'ari@k': avg_ri_k, 'ari@k-std': std_ri_k,
-                # 'acc@k': avg_acc_k, 'acc@k-std': std_acc_k,
-                'purity@k': avg_pu_k, 'purity@k-std': std_pu_k,
-                'nmi@k': avg_nmi_k, 'nmi@k-std': std_nmi_k}
+        return {'test_loss': avg_loss}
+                # 'test_ri': avg_ri,
+                # 'ari@k': avg_ri_k, 'ari@k-std': std_ri_k,
+                # # 'acc@k': avg_acc_k, 'acc@k-std': std_acc_k,
+                # 'purity@k': avg_pu_k, 'purity@k-std': std_pu_k,
+                # 'nmi@k': avg_nmi_k, 'nmi@k-std': std_nmi_k}
+
