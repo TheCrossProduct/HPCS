@@ -11,8 +11,7 @@ class SAModule(torch.nn.Module):
 
     def forward(self, x, pos, batch):
         idx = fps(pos, batch, ratio=self.ratio)
-        row, col = radius(pos, pos[idx], self.r, batch, batch[idx],
-                          max_num_neighbors=64)
+        row, col = radius(pos, pos[idx], self.r, batch, batch[idx], max_num_neighbors=64)
         edge_index = torch.stack([col, row], dim=0)
         x_dst = None if x is None else x[idx]
         x = self.conv((x, x_dst), (pos, pos[idx]), edge_index)
@@ -50,9 +49,11 @@ class GlobalSAModule(torch.nn.Module):
 class PointNet2(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
 
         # Input channels account for both `pos` and node features.
-        self.sa1_module = SAModule(0.2, 0.2, MLP([in_channels, 64, 64, 128]))
+        self.sa1_module = SAModule(0.2, 0.2, MLP([self.in_channels, 64, 64, 128]))
         self.sa2_module = SAModule(0.25, 0.4, MLP([128 + 3, 128, 128, 256]))
         self.sa3_module = GlobalSAModule(MLP([256 + 3, 256, 512, 1024]))
 
@@ -60,11 +61,8 @@ class PointNet2(torch.nn.Module):
         self.fp2_module = FPModule(3, MLP([256 + 128, 256, 128]))
         self.fp1_module = FPModule(3, MLP([128 + 3, 128, 128, 128]))
 
-        self.mlp = MLP([128, 128, 128, out_channels], dropout=0.5, norm=None)
+        self.mlp = MLP([128, 128, 128, self.out_channels], dropout=0.5, norm=None)
 
-        self.lin1 = torch.nn.Linear(128, 128)
-        self.lin2 = torch.nn.Linear(128, 128)
-        self.lin3 = torch.nn.Linear(128, out_channels)
 
     def forward(self, x, pos, batch):
         sa0_out = (x, pos, batch)

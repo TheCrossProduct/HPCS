@@ -16,6 +16,7 @@ from hpcs.nn.models._hyp_hc import SimilarityHypHC
 from hpcs.nn.models.encoders.dgcnn import DGCNN
 from hpcs.nn.models.encoders.dgcnn2 import DGCNN2
 from hpcs.nn.models.encoders.point_transformer import PointTransformer
+from hpcs.nn.models.encoders.pointnet import PointNetDenseCls
 from hpcs.nn.models.encoders.pointnet2 import PointNet2
 
 
@@ -30,8 +31,8 @@ def configure(config):
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--logdir', default='logs', type=str, help='dirname for logs')
-    parser.add_argument('--data', default='shapenet', type=str, help='name of dataset to use')
-    parser.add_argument('--model', default='dgcnn', type=str, help='model to use to extract features')
+    parser.add_argument('--data', default= config.dataset, type=str, help='name of dataset to use')
+    parser.add_argument('--model', default= config.model, type=str, help='model to use to extract features')
     parser.add_argument('--k', default=10, type=int, help='if model dgcnn, k is the number of neigh to take into account')
     parser.add_argument('--hidden', default=64, type=int, help='number of hidden features')
     parser.add_argument('--negative_slope', default=0.2, type=float, help='negative slope for leaky relu in the feature extractor')
@@ -47,7 +48,7 @@ def configure(config):
     parser.add_argument('--lr', default=config.lr, type=float, help='learning rate')
     parser.add_argument('--patience', default=50, type=int, help='patience value for early stopping')
     parser.add_argument('--plot', default=-1, type=int, help='interval in which we plot prediction on validation batch')
-    parser.add_argument('--gpu', default="", type=str, help='use gpu')
+    parser.add_argument('--gpu', default="0", type=str, help='use gpu')
     parser.add_argument('--distributed', help='if True run on a cluster machine', action='store_true')
     parser.add_argument('--num_workers', type=int, default=6)
     parser.add_argument('--fixed_points', type=int, default=config.fixed_points)
@@ -85,9 +86,6 @@ def configure(config):
     train_dataset = ShapeNet(path, category, split='train', transform=transform, pre_transform=pre_transform)
     valid_dataset = ShapeNet(path, category, split='val', transform=transform, pre_transform=pre_transform)
     test_dataset = ShapeNet(path, category, split='test', transform=transform, pre_transform=pre_transform)
-    train_dataset = train_dataset[0:100]
-    valid_dataset = valid_dataset[0:20]
-    test_dataset = test_dataset[0:10]
 
     train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers)
     valid_loader = DataLoader(valid_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
@@ -108,11 +106,13 @@ def configure(config):
         nn = DGCNN(in_channels=3, hidden_features=hidden, out_features=out_features, k=k, transformer=False,
                    dropout=dropout, negative_slope=negative_slope, cosine=cosine)
     elif model_name == 'dgcnn2':
-        nn = DGCNN2(in_channels=3, out_channels=out_features, k=30)
+        nn = DGCNN2(in_channels=6, out_channels=out_features, k=k, dropout=dropout)
     elif model_name == 'point_transformer':
         nn = PointTransformer(in_channels=3, out_channels=out_features, dim_model=[32, 64, 128, 256, 512], k=30)
     elif model_name == 'pointnet2':
         nn = PointNet2(in_channels=6, out_channels=out_features)
+    elif model_name == 'pointnet':
+        nn = PointNetDenseCls(num_points=fixed_points, k=out_features)
 
 
     model = SimilarityHypHC(nn=nn,
@@ -157,8 +157,8 @@ def configure(config):
                          max_epochs=epochs,
                          callbacks=[early_stop_callback, checkpoint_callback],
                          logger=logger,
-                         limit_train_batches=4,
-                         limit_test_batches=4,
+                         # limit_train_batches=4,
+                         # limit_test_batches=4,
                          # track_grad_norm=2
                          )
 
@@ -190,13 +190,13 @@ if __name__ == "__main__":
     # wandb.agent(sweep_id, function=sweep, count=1, project="HPCS")
 
     config = dict(
-        batch=1,
-        epochs=1,
+        batch=2,
+        epochs=5,
         lr=0.001,
-        fixed_points=150,
+        fixed_points=400,
         min_scale=0.01,
-        architecture="DGCNN",
-        dataset_id="shapenet",
+        model="dgcnn",
+        dataset="shapenet",
     )
 
     wandb.init(project='HPCS', config=config)

@@ -240,7 +240,7 @@ class SimilarityHypHC(pl.LightningModule):
                              k=k,
                              show=True)
 
-        plot_cloud(xyz=data.pos.numpy(), scalars=y_pred_k, point_size=3.0, notebook=True)
+        # plot_cloud(xyz=data.pos.numpy(), scalars=y_pred_k, point_size=3.0, notebook=True)
 
         n_clusters = data.y.max() + 1
         y_pred = fcluster(linkage_matrix[0], n_clusters, criterion='maxclust') - 1

@@ -12,13 +12,11 @@ from hpcs.nn.models.encoders.pointnet2 import PointNet2
 def configure(config):
     parser = argparse.ArgumentParser()
     parser.add_argument('--logdir', default='logs', type=str, help='dirname for logs')
-    parser.add_argument('--data', default='shapenet', type=str, help='name of dataset to use')
-    parser.add_argument('--model', default='dgcnn2', type=str, help='model to use to extract features')
-    parser.add_argument('--k', default=10, type=int,
-                        help='if model dgcnn, k is the number of neigh to take into account')
+    parser.add_argument('--data', default='shapenet', type=str, help='name of dataset to use') # str(config['dataset']['value'])
+    parser.add_argument('--model', default='dgcnn', type=str, help='model to use to extract features') # str(config['model']['value'])
+    parser.add_argument('--k', default=10, type=int, help='if model dgcnn, k is the number of neigh to take into account')
     parser.add_argument('--hidden', default=64, type=int, help='number of hidden features')
-    parser.add_argument('--negative_slope', default=0.2, type=float,
-                        help='negative slope for leaky relu in the feature extractor')
+    parser.add_argument('--negative_slope', default=0.2, type=float, help='negative slope for leaky relu in the feature extractor')
     parser.add_argument('--dropout', default=0.0, type=float, help='dropout in the feature extractor')
     parser.add_argument('--cosine', help='if True add use cosine dist in DynamicEdgeConv', action='store_true')
     parser.add_argument('--distance', default='cosine', type=str, help='distance to use to compute triplets')

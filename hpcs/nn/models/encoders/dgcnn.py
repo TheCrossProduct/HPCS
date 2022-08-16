@@ -2,8 +2,9 @@ import torch
 
 from hpcs.nn.conv import DynamicEdgeConv
 
+import torch.nn.functional as F
 from hpcs.nn.models.networks._point_net import TransformNet
-from hpcs.nn.models.networks._mlp import MLP
+from torch_geometric.nn import MLP
 
 class DGCNN(torch.nn.Module):
     def __init__(self, in_channels: int, out_features: int, hidden_features: int, k: int, transformer: bool = False,
@@ -21,17 +22,17 @@ class DGCNN(torch.nn.Module):
             self.tnet = TransformNet()
 
         self.conv1 = DynamicEdgeConv(
-            nn=MLP([2 * in_channels, hidden_features], dropout=dropout, negative_slope=self.negative_slope),
+            nn=MLP([2 * in_channels, hidden_features, hidden_features], dropout=dropout, negative_slope=self.negative_slope),
             k=self.k,
             cosine=False,
         )
         self.conv2 = DynamicEdgeConv(
-            nn=MLP([2 * hidden_features, hidden_features], dropout=dropout, negative_slope=self.negative_slope),
+            nn=MLP([2 * hidden_features, hidden_features, hidden_features], dropout=dropout, negative_slope=self.negative_slope),
             k=self.k,
             cosine=False,
         )
         self.conv3 = DynamicEdgeConv(
-            nn=MLP([2 * hidden_features, out_features], dropout=dropout, negative_slope=self.negative_slope),
+            nn=MLP([2 * hidden_features, hidden_features, out_features], dropout=dropout, negative_slope=self.negative_slope),
             k=self.k,
             cosine=self.cosine,
         )
