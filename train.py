@@ -100,7 +100,7 @@ def configure(config):
     print("Gpu: ", gpu)
 
 
-    out_features = 2
+    out_features = 10
     # todo parametrize this
     if model_name == 'dgcnn':
         nn = DGCNN(in_channels=3, hidden_features=hidden, out_features=out_features, k=k, transformer=False,
@@ -157,8 +157,8 @@ def configure(config):
                          max_epochs=epochs,
                          callbacks=[early_stop_callback, checkpoint_callback],
                          logger=logger,
-                         # limit_train_batches=4,
-                         # limit_test_batches=4,
+                         limit_train_batches=100,
+                         limit_test_batches=100,
                          # track_grad_norm=2
                          )
 

@@ -1,11 +1,12 @@
+import pytorch_lightning.utilities.enums
 import torch
 from torch.nn import functional as F
 import numpy as np
 from pytorch_metric_learning.losses import BaseMetricLossFunction, TripletMarginLoss
 from pytorch_metric_learning.utils import loss_and_miner_utils as lmu
-from hpcs.distances.poincare import HyperbolicDistance, HyperbolicLCA
+from hpcs.distances.poincare import PoincareDisk, PoincareBall
 from pytorch_metric_learning.distances import CosineSimilarity, LpDistance
-from typing import Union
+
 
 class TripletHyperbolicLoss(BaseMetricLossFunction):
     def __init__(self, sim_distance: str = 'cosine', margin: float = 1.0, init_rescale: float = 1e-3,
@@ -17,7 +18,7 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
             self.distace_sim = CosineSimilarity()
             # self.loss_triplet_sim = losses.TripletMarginLoss(distance=self.distace_sim, margin=self.margin)
         elif sim_distance == 'hyperbolic':
-            self.distace_sim = HyperbolicDistance()
+            self.distace_sim = PoincareBall()
             # self.loss_triplet_sim = losses.TripletMarginLoss(distance=self.distace_sim, margin=self.margin)
         elif sim_distance == 'euclidean':
             self.distace_sim = LpDistance()
@@ -38,7 +39,7 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
         # distances to compute losses
         self.loss_triplet_sim = TripletMarginLoss(distance=self.distace_sim, margin=self.margin)
         # loss between embeddings in
-        self.distance_lca = HyperbolicLCA()
+        self.distance_lca = PoincareBall()
 
     def anneal(self):
         # TODO: review this function

@@ -153,8 +153,7 @@ def hyp_dist_o(x):
     # return 2 * torch.atanh(x_norm)
 
 
-""" Distances on the poincare ball"""
-class HyperbolicDistance(BaseDistance):
+class PoincareBall(BaseDistance):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.p = 2
@@ -177,35 +176,37 @@ class HyperbolicDistance(BaseDistance):
         else:
             xy = torch.cdist(x, y, p=self.p) ** self.p
 
-        xx = 1 - torch.norm(x, p=self.p, dim=-1, keepdim=True) ** self.p
-        yy = 1 - torch.norm(y, p=self.p, dim=-1, keepdim=True) ** self.p
+        # xx = 1 - torch.norm(x, p=self.p, dim=-1, keepdim=True) ** self.p
+        # yy = 1 - torch.norm(y, p=self.p, dim=-1, keepdim=True) ** self.p
+        #
+        # if x.dim() == 2:
+        #     ## xx and yy have shape Nx1
+        #     xxyy = torch.matmul(xx, yy.T)
+        # elif x.dim() == 3:
+        #     ## xx and yy have shape BxNx1
+        #     xxyy = torch.einsum('ikj,ihj->ikh', xx, yy)
+        # else:
+        #     raise ValueError("Distance implemented only for tensors of rank 2 and 3")
+        #
+        # dxy = 1 + 2 * (xy / xxyy)
 
-        if x.dim() == 2:
-            ## xx and yy have shape Nx1
-            xxyy = torch.matmul(xx, yy.T)
-        elif x.dim() == 3:
-            ## xx and yy have shape BxNx1
-            xxyy = torch.einsum('ikj,ihj->ikh', xx, yy)
-        else:
-            raise ValueError("Distance implemented only for tensors of rank 2 and 3")
-
-        dxy = 1 + 2 * (xy / xxyy)
-
-        return torch.acosh(dxy)
+        return xy
 
     def pairwise_distance(self, query_emb, ref_emb):
         x = project(query_emb)
         y = project(ref_emb)
         xy = torch.nn.functional.pairwise_distance(x, y, p=self.p) ** self.p
-        xx = 1 - torch.norm(x, dim=-1, p=self.p) ** self.p
-        yy = 1 - torch.norm(y, dim=-1, p=self.p) ** self.p
+        # xx = 1 - torch.norm(x, dim=-1, p=self.p) ** self.p
+        # yy = 1 - torch.norm(y, dim=-1, p=self.p) ** self.p
+        #
+        # dxy = 1 + 2 * (xy / (xx*yy))
+        #
+        # return torch.acosh(dxy)
 
-        dxy = 1 + 2 * (xy / (xx*yy))
-
-        return torch.acosh(dxy)
+        return xy
 
 
-class HyperbolicLCA(BaseDistance):
+class PoincareDisk(BaseDistance):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.p = 2
