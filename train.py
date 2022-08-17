@@ -48,11 +48,12 @@ def configure(config):
     parser.add_argument('--lr', default=config.lr, type=float, help='learning rate')
     parser.add_argument('--patience', default=50, type=int, help='patience value for early stopping')
     parser.add_argument('--plot', default=-1, type=int, help='interval in which we plot prediction on validation batch')
-    parser.add_argument('--gpu', default="0", type=str, help='use gpu')
+    parser.add_argument('--gpu', default=config.gpu, type=str, help='use gpu')
     parser.add_argument('--distributed', help='if True run on a cluster machine', action='store_true')
     parser.add_argument('--num_workers', type=int, default=6)
     parser.add_argument('--fixed_points', type=int, default=config.fixed_points)
     parser.add_argument('--min_scale', type=int, default=config.min_scale)
+    parser.add_argument('--embedding', type=int, default=config.embedding)
 
     args = parser.parse_args()
 
@@ -78,6 +79,7 @@ def configure(config):
     num_workers = args.num_workers
     fixed_points = args.fixed_points
     min_scale = args.min_scale
+    embedding = args.embedding
 
     category = 'Airplane'  # Pass in `None` to train on all categories.
     path = osp.join(osp.dirname(osp.realpath(__file__)), 'data', 'ShapeNet')
@@ -100,7 +102,7 @@ def configure(config):
     print("Gpu: ", gpu)
 
 
-    out_features = 10
+    out_features = embedding
     # todo parametrize this
     if model_name == 'dgcnn':
         nn = DGCNN(in_channels=3, hidden_features=hidden, out_features=out_features, k=k, transformer=False,
@@ -195,8 +197,10 @@ if __name__ == "__main__":
         lr=0.001,
         fixed_points=400,
         min_scale=0.01,
+        embedding=10,
         model="dgcnn",
         dataset="shapenet",
+        gpu="0",
     )
 
     wandb.init(project='HPCS', config=config)

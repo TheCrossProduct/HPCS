@@ -33,6 +33,7 @@ def configure(config):
     parser.add_argument('--distributed', help='if True run on a cluster machine', action='store_true')
     parser.add_argument('--num_workers', type=int, default=6)
     parser.add_argument('--fixed_points', type=int, default=config['fixed_points']['value'])
+    parser.add_argument('--embedding', type=int, default=config['embedding']['value'])
 
     args, unknown = parser.parse_known_args()
 
@@ -57,6 +58,7 @@ def configure(config):
     distr = args.distributed
     num_workers = args.num_workers
     fixed_points = args.fixed_points
+    embedding = args.embedding
 
     if len(args.gpu):
         gpu = [int(g) for g in args.gpu.split(',')]
@@ -66,7 +68,7 @@ def configure(config):
     print("Gpu: ", gpu)
 
 
-    out_features = 2
+    out_features = embedding
     # todo parametrize this
     if model_name == 'dgcnn':
         nn = DGCNN(in_channels=3, hidden_features=hidden, out_features=out_features, k=k, transformer=False,
