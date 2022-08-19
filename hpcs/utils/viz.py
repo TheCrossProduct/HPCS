@@ -293,13 +293,13 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, y_pred=
     idx += 1
     ax = plt.subplot(1, n_plots, idx)
     plot_clustering(emb_hidden, y_pred)
-    ax.set_title('Encoded Space')
+    ax.set_title('Embedding')
     idx += 1
     ax = plt.subplot(1, n_plots, idx)
     plot_clustering(emb_poincare, y_pred)
     # ax.set_xlim(-1 - 1e-1, 1 + 1e-1)
     # ax.set_ylim(-1 - 1e-1, 1 + 1e-1)
-    ax.set_title('Poincaré Disk')
+    ax.set_title('Poincaré')
     idx += 1
     ax = plt.subplot(1, n_plots, idx)
     plot_dendrogram(linkage_matrix, n_clusters=k)
