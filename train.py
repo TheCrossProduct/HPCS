@@ -203,7 +203,7 @@ if __name__ == "__main__":
         dropout=0.0,
         fixed_points=400,
         min_scale=0.1,
-        embedding=100,
+        embedding=1000,
         model="dgcnn",
         dataset="shapenet",
         gpu="0",

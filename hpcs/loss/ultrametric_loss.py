@@ -74,11 +74,11 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
             # mat_sim = 0.5 * (1 + self.distace_sim(project(x_emb_samples)))
             mat_sim = torch.exp(-self.distace_sim(embeddings))
 
-        mat_lca = self.distance_lca(self._rescale_emb(embeddings))
         wij = mat_sim[anchor_idx, positive_idx]
         wik = mat_sim[anchor_idx, negative_idx]
         wjk = mat_sim[positive_idx, negative_idx]
 
+        mat_lca = self.distance_lca(self._rescale_emb(embeddings))
         dij = mat_lca[anchor_idx, positive_idx]
         dik = mat_lca[anchor_idx, negative_idx]
         djk = mat_lca[positive_idx, negative_idx]

@@ -8,7 +8,7 @@ _wandb:
     is_jupyter_run: false
     is_kaggle_kernel: false
     python_version: 3.10.4
-    start_time: 1661348987.797813
+    start_time: 1661450241.361898
     t:
       1:
       - 1
@@ -51,10 +51,10 @@ dropout:
   value: 0.0
 embedding:
   desc: null
-  value: 100
+  value: 1000
 epochs:
   desc: null
-  value: 2
+  value: 1
 factor:
   desc: null
   value: 0.5

@@ -1,3 +1,4 @@
+import scipy.spatial.distance
 import wandb
 import torch
 import numpy as np
@@ -16,6 +17,7 @@ from sklearn.metrics.cluster import adjusted_rand_score as ri
 from hpcs.utils.viz import plot_hyperbolic_eval, plot_cloud
 from hpcs.utils.scores import eval_clustering, get_optimal_k
 from hpcs.loss.ultrametric_loss import TripletHyperbolicLoss
+from hpcs.distances.poincare import project
 
 from hpcs.optim import RAdam
 
@@ -87,10 +89,12 @@ class SimilarityHypHC(pl.LightningModule):
 
     def _decode_linkage(self, leaves_embeddings):
         """Build linkage matrix from leaves' embeddings. Assume points are normalized to same radius."""
-        leaves_embeddings = self.triplet_loss._rescale_emb(leaves_embeddings)
-        sim_fn = lambda x, y: np.arccos(np.clip(np.sum(x * y, axis=-1), -1.0, 1.0))
-        embeddings = F.normalize(leaves_embeddings, p=2, dim=1).detach().cpu()
-        Z = linkage(embeddings, method='single', metric=sim_fn)
+        # leaves_embeddings = self.triplet_loss._rescale_emb(leaves_embeddings)
+        # sim_fn = lambda x, y: np.arccos(np.clip(np.sum(x * y, axis=-1), -1.0, 1.0))
+        # embeddings = F.normalize(leaves_embeddings, p=2, dim=1).detach().cpu()
+        # embeddings = F.normalize(leaves_embeddings, p=2, dim=1).detach().cpu()
+        # embeddings = project(embeddings).detach().cpu()
+        Z = linkage(leaves_embeddings, method='ward', metric='euclidean')
 
         return Z
 
