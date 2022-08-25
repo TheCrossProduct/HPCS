@@ -22,22 +22,27 @@ class DGCNN(torch.nn.Module):
             self.tnet = TransformNet()
 
         self.conv1 = DynamicEdgeConv(
-            nn=MLP([2 * in_channels, hidden_features, hidden_features], dropout=dropout, negative_slope=self.negative_slope),
+            nn=MLP([2 * in_channels, hidden_features, hidden_features, hidden_features], dropout=dropout, negative_slope=self.negative_slope),
             k=self.k,
             cosine=False,
         )
         self.conv2 = DynamicEdgeConv(
-            nn=MLP([2 * hidden_features, hidden_features, hidden_features], dropout=dropout, negative_slope=self.negative_slope),
+            nn=MLP([2 * hidden_features, hidden_features, hidden_features, hidden_features], dropout=dropout, negative_slope=self.negative_slope),
             k=self.k,
             cosine=False,
         )
         self.conv3 = DynamicEdgeConv(
-            nn=MLP([2 * hidden_features, hidden_features, out_features], dropout=dropout, negative_slope=self.negative_slope),
+            nn=MLP([2 * hidden_features, hidden_features, hidden_features, self.out_features], dropout=dropout, negative_slope=self.negative_slope),
             k=self.k,
             cosine=self.cosine,
         )
 
-    def forward(self, x, batch=None):
+
+    def forward(self, data):
+        x = data.x
+        pos = data.pos
+        batch = data.batch
+
         if self.transformer:
             tr = self.tnet(x, batch=batch)
 
@@ -47,6 +52,8 @@ class DGCNN(torch.nn.Module):
                 batch_size = batch.max().item() + 1
                 x = torch.cat([torch.matmul(x[batch == i], tr[i]) for i in range(batch_size)])
 
+        # x = torch.cat([x, pos], dim=-1)
+        x = pos
         x = self.conv1(x, batch=batch)
         x = self.conv2(x, batch=batch)
         x = self.conv3(x, batch=batch)

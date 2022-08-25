@@ -5,8 +5,8 @@ import pytorch_lightning as pl
 from hpcs.nn.models._hyp_hc import SimilarityHypHC
 from hpcs.nn.models.encoders.dgcnn import DGCNN
 from hpcs.nn.models.encoders.dgcnn2 import DGCNN2
-from hpcs.nn.models.encoders.point_transformer import PointTransformer
-from hpcs.nn.models.encoders.pointnet2 import PointNet2
+from hpcs.nn.models.encoders.pointnet import PointNet
+from hpcs.nn.models.encoders.vndgcnn_source import VNDGCNN
 
 
 def configure(config):
@@ -67,18 +67,17 @@ def configure(config):
     print("Distributed: ", distr)
     print("Gpu: ", gpu)
 
-
     out_features = embedding
     # todo parametrize this
     if model_name == 'dgcnn':
         nn = DGCNN(in_channels=3, hidden_features=hidden, out_features=out_features, k=k, transformer=False,
                    dropout=dropout, negative_slope=negative_slope, cosine=cosine)
     elif model_name == 'dgcnn2':
-        nn = DGCNN2(in_channels=3, out_channels=out_features, k=30)
-    elif model_name == 'point_transformer':
-        nn = PointTransformer(in_channels=3, out_channels=out_features, dim_model=[32, 64, 128, 256, 512], k=30)
-    elif model_name == 'pointnet2':
-        nn = PointNet2(in_channels=6, out_channels=out_features)
+        nn = DGCNN2(in_channels=6, out_channels=out_features, k=k, dropout=dropout)
+    elif model_name == 'pointnet':
+        nn = PointNet(in_channels=3, out_features=out_features)
+    elif model_name == 'vndgcnn':
+        nn = VNDGCNN(in_channels=3, out_features=out_features, k=k, dropout=dropout)
 
 
     model = SimilarityHypHC(nn=nn,

@@ -94,7 +94,10 @@ class SimilarityHypHC(pl.LightningModule):
 
         return Z
 
-    def forward(self, x, y, pos, labels=None, batch=None, decode=False):
+    def forward(self, data, labels=None, batch=None, decode=False):
+        x = data.x
+        y = data.y
+        pos = data.pos
 
         if batch is None:
             batch = torch.zeros(x.size(0), dtype=torch.long)
@@ -102,7 +105,7 @@ class SimilarityHypHC(pl.LightningModule):
         batch_size = batch.max() + 1
 
         # feature extractor
-        x_emb = self.model(pos)
+        x_emb = self.model(data)
 
         linkage_mat = []
 
@@ -143,7 +146,7 @@ class SimilarityHypHC(pl.LightningModule):
         else:
             labels = None
 
-        x, loss_triplet, loss_hyphc, link_mat = self(x=x, y=y, pos=pos, labels=labels, batch=batch, decode=decode)
+        x, loss_triplet, loss_hyphc, link_mat = self(data=data, labels=labels, batch=batch, decode=decode)
 
         return x, loss_triplet, loss_hyphc, link_mat
 
@@ -230,6 +233,7 @@ class SimilarityHypHC(pl.LightningModule):
 
         y_pred_k, k, best_ri = get_optimal_k(data.y.detach().cpu().numpy(), linkage_matrix[0])
         pu_score, nmi_score, ri_score = eval_clustering(y_true=data.y.detach().cpu(), Z=linkage_matrix[0])
+
 
         plot_hyperbolic_eval(x=data.pos.detach().cpu(),
                              y=data.y.detach().cpu(),

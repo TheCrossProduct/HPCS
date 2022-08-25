@@ -15,9 +15,8 @@ from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from hpcs.nn.models._hyp_hc import SimilarityHypHC
 from hpcs.nn.models.encoders.dgcnn import DGCNN
 from hpcs.nn.models.encoders.dgcnn2 import DGCNN2
-from hpcs.nn.models.encoders.point_transformer import PointTransformer
-from hpcs.nn.models.encoders.pointnet import PointNetDenseCls
-from hpcs.nn.models.encoders.pointnet2 import PointNet2
+from hpcs.nn.models.encoders.pointnet import PointNet
+from hpcs.nn.models.encoders.vndgcnn_source import VNDGCNN
 
 
 # def sweep():
@@ -38,7 +37,7 @@ def configure(config):
     parser.add_argument('--negative_slope', default=0.2, type=float, help='negative slope for leaky relu in the feature extractor')
     parser.add_argument('--dropout', default=config.dropout, type=float, help='dropout in the feature extractor')
     parser.add_argument('--cosine', help='if True add use cosine dist in DynamicEdgeConv', action='store_true')
-    parser.add_argument('--distance', default='cosine', type=str, help='distance to use to compute triplets')
+    parser.add_argument('--distance', default='hyperbolic', type=str, help='distance to use to compute triplets')
     parser.add_argument('--margin', default=1.0, type=float, help='margin value to use in triplet loss')
     parser.add_argument('--temperature', default=0.05, type=float, help='rescale softmax value used in the hyphc loss')
     parser.add_argument('--annealing', default=1.0, type=float, help='annealing factor')
@@ -50,7 +49,7 @@ def configure(config):
     parser.add_argument('--plot', default=-1, type=int, help='interval in which we plot prediction on validation batch')
     parser.add_argument('--gpu', default=config.gpu, type=str, help='use gpu')
     parser.add_argument('--distributed', help='if True run on a cluster machine', action='store_true')
-    parser.add_argument('--num_workers', type=int, default=6)
+    parser.add_argument('--num_workers', type=int, default=10)
     parser.add_argument('--fixed_points', type=int, default=config.fixed_points)
     parser.add_argument('--min_scale', type=int, default=config.min_scale)
     parser.add_argument('--embedding', type=int, default=config.embedding)
@@ -88,6 +87,7 @@ def configure(config):
     train_dataset = ShapeNet(path, category, split='train', transform=transform, pre_transform=pre_transform)
     valid_dataset = ShapeNet(path, category, split='val', transform=transform, pre_transform=pre_transform)
     test_dataset = ShapeNet(path, category, split='test', transform=transform, pre_transform=pre_transform)
+    test_dataset = test_dataset[0:20]
 
     train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers)
     valid_loader = DataLoader(valid_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
@@ -109,12 +109,10 @@ def configure(config):
                    dropout=dropout, negative_slope=negative_slope, cosine=cosine)
     elif model_name == 'dgcnn2':
         nn = DGCNN2(in_channels=6, out_channels=out_features, k=k, dropout=dropout)
-    elif model_name == 'point_transformer':
-        nn = PointTransformer(in_channels=3, out_channels=out_features, dim_model=[32, 64, 128, 256, 512], k=30)
-    elif model_name == 'pointnet2':
-        nn = PointNet2(in_channels=6, out_channels=out_features)
     elif model_name == 'pointnet':
-        nn = PointNetDenseCls(num_points=fixed_points, k=out_features)
+        nn = PointNet(in_channels=3, out_features=out_features)
+    elif model_name == 'vndgcnn':
+        nn = VNDGCNN(in_channels=3, out_features=out_features, k=k, dropout=dropout)
 
 
     model = SimilarityHypHC(nn=nn,
@@ -200,12 +198,12 @@ if __name__ == "__main__":
 
     config = dict(
         batch=2,
-        epochs=2,
-        lr=0.001,
+        epochs=1,
+        lr=0.0001,
         dropout=0.0,
         fixed_points=400,
-        min_scale=0.01,
-        embedding=2,
+        min_scale=0.1,
+        embedding=100,
         model="dgcnn",
         dataset="shapenet",
         gpu="0",
