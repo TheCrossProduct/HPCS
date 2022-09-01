@@ -37,7 +37,7 @@ def configure(config):
     parser.add_argument('--negative_slope', default=0.2, type=float, help='negative slope for leaky relu in the feature extractor')
     parser.add_argument('--dropout', default=config.dropout, type=float, help='dropout in the feature extractor')
     parser.add_argument('--cosine', help='if True add use cosine dist in DynamicEdgeConv', action='store_true')
-    parser.add_argument('--distance', default='hyperbolic', type=str, help='distance to use to compute triplets')
+    parser.add_argument('--distance', default='cosine', type=str, help='distance to use to compute triplets')
     parser.add_argument('--margin', default=1.0, type=float, help='margin value to use in triplet loss')
     parser.add_argument('--temperature', default=0.05, type=float, help='rescale softmax value used in the hyphc loss')
     parser.add_argument('--annealing', default=1.0, type=float, help='annealing factor')
@@ -51,7 +51,6 @@ def configure(config):
     parser.add_argument('--distributed', help='if True run on a cluster machine', action='store_true')
     parser.add_argument('--num_workers', type=int, default=10)
     parser.add_argument('--fixed_points', type=int, default=config.fixed_points)
-    parser.add_argument('--min_scale', type=int, default=config.min_scale)
     parser.add_argument('--embedding', type=int, default=config.embedding)
 
     args = parser.parse_args()
@@ -77,7 +76,6 @@ def configure(config):
     distr = args.distributed
     num_workers = args.num_workers
     fixed_points = args.fixed_points
-    min_scale = args.min_scale
     embedding = args.embedding
 
     category = 'Airplane'  # Pass in `None` to train on all categories.
@@ -116,7 +114,6 @@ def configure(config):
 
 
     model = SimilarityHypHC(nn=nn,
-                            min_scale=min_scale,
                             sim_distance=distance,
                             margin=margin,
                             temperature=temperature,
@@ -140,8 +137,7 @@ def configure(config):
                     'epochs': epochs,
                     'batch': batch,
                     'lr': lr,
-                    'fixed_points': fixed_points,
-                    'min_scale': min_scale}
+                    'fixed_points': fixed_points}
     print(model_params)
 
     savedir = os.path.join(logger.save_dir, logger.name, 'version_' + str(logger.version), 'checkpoints')
@@ -197,13 +193,12 @@ if __name__ == "__main__":
     # wandb.agent(sweep_id, function=sweep, count=1, project="HPCS")
 
     config = dict(
-        batch=2,
+        batch=1,
         epochs=1,
         lr=0.0001,
         dropout=0.0,
-        fixed_points=400,
-        min_scale=0.1,
-        embedding=1000,
+        fixed_points=200,
+        embedding=100,
         model="dgcnn",
         dataset="shapenet",
         gpu="0",

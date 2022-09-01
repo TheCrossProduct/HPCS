@@ -62,19 +62,19 @@ class SimilarityHypHC(pl.LightningModule):
             plot validation value every #plot_every epoch
 
     """
-    def __init__(self, nn: torch.nn.Module, min_scale: float = 1e-2,
+    def __init__(self, nn: torch.nn.Module,
                  sim_distance: str = 'cosine', temperature: float = 0.05, anneal: float = 0.5, anneal_step: int = 0,
                  margin: float = 1.0, init_rescale: float = 1e-3, max_scale: float = 1. - 1e-3, lr: float = 1e-3,
-                 patience: int = 10, factor: float = 0.5, min_lr: float = 1e-4,
-                 plot_every: int = -1):
+                 patience: int = 10, factor: float = 0.5, min_lr: float = 1e-4, plot_every: int = -1):
         super(SimilarityHypHC, self).__init__()
         self.save_hyperparameters()
         self.model = nn
 
+        self.scale = torch.nn.Parameter(torch.Tensor([init_rescale]), requires_grad=True)
+
         self.triplet_loss = TripletHyperbolicLoss(sim_distance=sim_distance,
                                                   margin=margin,
-                                                  init_rescale=init_rescale,
-                                                  min_scale=min_scale,
+                                                  scale=self.scale,
                                                   max_scale=max_scale,
                                                   temperature=temperature,
                                                   anneal=anneal)
@@ -89,11 +89,9 @@ class SimilarityHypHC(pl.LightningModule):
 
     def _decode_linkage(self, leaves_embeddings):
         """Build linkage matrix from leaves' embeddings. Assume points are normalized to same radius."""
-        # leaves_embeddings = self.triplet_loss._rescale_emb(leaves_embeddings)
+        leaves_embeddings = self.triplet_loss.normalize_embeddings(leaves_embeddings)
+        leaves_embeddings = project(leaves_embeddings).detach().cpu()
         # sim_fn = lambda x, y: np.arccos(np.clip(np.sum(x * y, axis=-1), -1.0, 1.0))
-        # embeddings = F.normalize(leaves_embeddings, p=2, dim=1).detach().cpu()
-        # embeddings = F.normalize(leaves_embeddings, p=2, dim=1).detach().cpu()
-        # embeddings = project(embeddings).detach().cpu()
         Z = linkage(leaves_embeddings, method='ward', metric='euclidean')
 
         return Z
@@ -108,16 +106,19 @@ class SimilarityHypHC(pl.LightningModule):
 
         batch_size = batch.max() + 1
 
+        # poincare = project(self.scale * pos)
+
         # feature extractor
-        x_emb = self.model(data)
+        x_emb = self.model(pos)
+        x_poincare = project(self.scale * x_emb)
 
         linkage_mat = []
 
         if labels is not None:
-            x_feat_samples = x_emb[labels]
+            x_feat_samples = x_poincare[labels]
             y_samples = y[labels]
         else:
-            x_feat_samples = x_emb
+            x_feat_samples = x_poincare
             y_samples = y
 
         losses = self.triplet_loss.compute_loss(embeddings=x_feat_samples,
@@ -132,10 +133,10 @@ class SimilarityHypHC(pl.LightningModule):
 
         if decode:
             for i in range(batch_size):
-                Z = self._decode_linkage(x_emb[batch == i])
+                Z = self._decode_linkage(x_poincare[batch == i])
                 linkage_mat.append(Z)
 
-        return x_emb, loss_triplet, loss_hyphc, linkage_mat
+        return x_emb, x_poincare, loss_triplet, loss_hyphc, linkage_mat
 
     def _forward(self, data, decode=False):
         if isinstance(data, list):
@@ -150,9 +151,9 @@ class SimilarityHypHC(pl.LightningModule):
         else:
             labels = None
 
-        x, loss_triplet, loss_hyphc, link_mat = self(data=data, labels=labels, batch=batch, decode=decode)
+        x_emb, x_poincare, loss_triplet, loss_hyphc, link_mat = self(data=data, labels=labels, batch=batch, decode=decode)
 
-        return x, loss_triplet, loss_hyphc, link_mat
+        return x_emb, x_poincare, loss_triplet, loss_hyphc, link_mat
 
     def configure_optimizers(self):
         optim = RAdam(self.parameters(), lr=self.lr)
@@ -170,7 +171,7 @@ class SimilarityHypHC(pl.LightningModule):
         return [optim], scheduler
 
     def training_step(self, data, batch_idx):
-        x, loss_triplet, loss_hyphc, _ = self._forward(data)
+        x, x_poincare, loss_triplet, loss_hyphc, _ = self._forward(data)
         loss = loss_triplet + loss_hyphc
 
         self.log("train_loss", {"total_loss": loss, "triplet_loss": loss_triplet, "hyphc_loss": loss_hyphc})
@@ -190,23 +191,24 @@ class SimilarityHypHC(pl.LightningModule):
 
     def validation_step(self, data, batch_idx):
         maybe_plot = self.plot_interval > 0 and ((self.current_epoch + 1) % self.plot_interval == 0)
-        x, val_loss_triplet, val_loss_hyphc, linkage_matrix = self._forward(data, decode=maybe_plot)
+        x, x_poincare, val_loss_triplet, val_loss_hyphc, linkage_matrix = self._forward(data, decode=maybe_plot)
         val_loss = val_loss_triplet + val_loss_hyphc
 
         fig = None
         best_ri = 0.0
 
         if maybe_plot:
-            y_pred, k, best_ri = get_optimal_k(data.y.detach().cpu().numpy(), linkage_matrix[0])
+            y_pred_k, k, best_ri = get_optimal_k(data.y.detach().cpu().numpy(), linkage_matrix[0])
             pu_score, nmi_score, ri_score = eval_clustering(y_true=data.y.detach().cpu(), Z=linkage_matrix[0])
 
-            fig = plot_hyperbolic_eval(x=data.pos.detach().cpu(),
-                                       y=data.y.detach().cpu(),
-                                       y_pred=y_pred,
-                                       emb=self.triplet_loss._rescale_emb(x).detach().cpu(),
-                                       linkage_matrix=linkage_matrix[0],
-                                       k=k,
-                                       show=True)
+            plot_hyperbolic_eval(x=data.pos.detach().cpu(),
+                                 y=data.y.detach().cpu(),
+                                 y_pred=y_pred_k,
+                                 emb_hidden=x.detach().cpu(),
+                                 emb_poincare=self.triplet_loss.normalize_embeddings(x_poincare).detach().cpu(),
+                                 linkage_matrix=linkage_matrix[0],
+                                 k=k,
+                                 show=True)
 
             # self.logger.experiment.add_scalar("RandScore/Validation", best_ri, self.plot_step)
             # # self.logger.experiment.add_scalar("AccScore@k/Validation", acc_score, self.plot_step)
@@ -232,7 +234,7 @@ class SimilarityHypHC(pl.LightningModule):
                                               global_step=step)
 
     def test_step(self, data, batch_idx):
-        x, test_loss_triplet, test_loss_hyphc, linkage_matrix = self._forward(data, decode=True)
+        x, x_poincare, test_loss_triplet, test_loss_hyphc, linkage_matrix = self._forward(data, decode=True)
         test_loss = test_loss_hyphc + test_loss_triplet
 
         y_pred_k, k, best_ri = get_optimal_k(data.y.detach().cpu().numpy(), linkage_matrix[0])
@@ -243,7 +245,7 @@ class SimilarityHypHC(pl.LightningModule):
                              y=data.y.detach().cpu(),
                              y_pred=y_pred_k,
                              emb_hidden=x.detach().cpu(),
-                             emb_poincare=self.triplet_loss._rescale_emb(x).detach().cpu(),
+                             emb_poincare=self.triplet_loss.normalize_embeddings(x_poincare).detach().cpu(),
                              linkage_matrix=linkage_matrix[0],
                              k=k,
                              show=True)

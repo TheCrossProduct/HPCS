@@ -8,7 +8,7 @@ _wandb:
     is_jupyter_run: false
     is_kaggle_kernel: false
     python_version: 3.10.4
-    start_time: 1661450241.361898
+    start_time: 1662036953.031907
     t:
       1:
       - 1
@@ -42,7 +42,7 @@ anneal_step:
   value: 0
 batch:
   desc: null
-  value: 2
+  value: 3
 dataset:
   desc: null
   value: shapenet
@@ -51,7 +51,7 @@ dropout:
   value: 0.0
 embedding:
   desc: null
-  value: 1000
+  value: 100
 epochs:
   desc: null
   value: 1
@@ -60,7 +60,7 @@ factor:
   value: 0.5
 fixed_points:
   desc: null
-  value: 400
+  value: 200
 gpu:
   desc: null
   value: '0'
@@ -79,9 +79,6 @@ max_scale:
 min_lr:
   desc: null
   value: 0.0001
-min_scale:
-  desc: null
-  value: 0.1
 model:
   desc: null
   value: dgcnn
@@ -99,7 +96,7 @@ resume:
   value: false
 sim_distance:
   desc: null
-  value: hyperbolic
+  value: cosine
 temperature:
   desc: null
   value: 0.05

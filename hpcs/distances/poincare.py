@@ -2,10 +2,9 @@ import torch
 from pytorch_metric_learning.distances import BaseDistance
 from pytorch_metric_learning.utils import loss_and_miner_utils as lmu
 
-from hpcs.utils.math import arctanh, arcosh, arsinh, tanh, cosh, sinh
+from hpcs.utils.math import arctanh, tanh
 
 """Poincare utils functions."""
-# from utils.math import arctanh, tanh
 
 MIN_NORM = 1e-15
 BALL_EPS = {torch.float32: 4e-3, torch.float64: 1e-5}
@@ -54,8 +53,7 @@ def ptransp(x, y, u):
 
 def expmap(u, p):
     u_norm = u.norm(dim=-1, p=2, keepdim=True).clamp_min(MIN_NORM)
-    # second_term = tanh(lambda_(p) * u_norm / 2) * u / u_norm
-    second_term = torch.tanh(lambda_(p) * u_norm / 2) * u / u_norm
+    second_term = tanh(lambda_(p) * u_norm / 2) * u / u_norm
     gamma_1 = mobius_add(p, second_term)
     return gamma_1
 
@@ -82,11 +80,6 @@ def mobius_add(x, y):
 
 def mobius_transf(z, x, pairwise=True):
     # mobius transf that maps x to origin and y to M(y)
-    # assert x.shape == z.shape
-    # n_samples, n_feat = x.shape[:2]
-    # assert n_feat % 2 == 0
-    # z1 = z.reshape(-1, 2)
-    # x1 = x.reshape(-1, 2)
     z1 = torch.view_as_complex(z)
     x1 = torch.view_as_complex(x)
 
@@ -100,18 +93,11 @@ def mobius_transf(z, x, pairwise=True):
     den = 1 - z1.conj()*x1
     out = num / den
 
-    out = torch.view_as_real(out)
+    return torch.view_as_real(out)
 
-    # return out.reshape(n_samples, n_feat)
-    return out
 
 def inverse_mobius_transf(z, x, pairwise=True):
     # inverse map of mobius transf
-    # assert x.shape == z.shape
-    # n_samples, n_feat = x.shape[:2]
-    # assert n_feat % 2 == 0
-    # z1 = z.reshape(-1, 2)
-    # x1 = x.reshape(-1, 2)
     z1 = torch.view_as_complex(z)
     x1 = torch.view_as_complex(x)
 
@@ -125,16 +111,14 @@ def inverse_mobius_transf(z, x, pairwise=True):
     den = 1 + z1.conj()*x1
 
     out = num / den
-    out = torch.view_as_real(out)
-    # return out.reshape(n_samples, n_feat)
-    return out
+
+    return torch.view_as_real(out)
 
 
 def mobius_mul(x, t):
     """Mobius scalar multiplication."""
     normx = x.norm(dim=-1, p=2, keepdim=True).clamp_min(MIN_NORM)
     return tanh(t * arctanh(normx)) * x / normx
-    # return torch.tanh(t * torch.atanh(normx)) * x / normx
 
 
 def get_midpoint_o(x):
@@ -150,10 +134,9 @@ def hyp_dist_o(x):
     """
     x_norm = x.norm(dim=-1, p=2, keepdim=True)
     return 2 * arctanh(x_norm)
-    # return 2 * torch.atanh(x_norm)
 
 
-class PoincareBall(BaseDistance):
+class HyperbolicDistance(BaseDistance):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.p = 2
@@ -176,37 +159,35 @@ class PoincareBall(BaseDistance):
         else:
             xy = torch.cdist(x, y, p=self.p) ** self.p
 
-        # xx = 1 - torch.norm(x, p=self.p, dim=-1, keepdim=True) ** self.p
-        # yy = 1 - torch.norm(y, p=self.p, dim=-1, keepdim=True) ** self.p
-        #
-        # if x.dim() == 2:
-        #     ## xx and yy have shape Nx1
-        #     xxyy = torch.matmul(xx, yy.T)
-        # elif x.dim() == 3:
-        #     ## xx and yy have shape BxNx1
-        #     xxyy = torch.einsum('ikj,ihj->ikh', xx, yy)
-        # else:
-        #     raise ValueError("Distance implemented only for tensors of rank 2 and 3")
-        #
-        # dxy = 1 + 2 * (xy / xxyy)
+        xx = 1 - torch.norm(x, p=self.p, dim=-1, keepdim=True) ** self.p
+        yy = 1 - torch.norm(y, p=self.p, dim=-1, keepdim=True) ** self.p
 
-        return xy
+        if x.dim() == 2:
+            ## xx and yy have shape Nx1
+            xxyy = torch.matmul(xx, yy.T)
+        elif x.dim() == 3:
+            ## xx and yy have shape BxNx1
+            xxyy = torch.einsum('ikj,ihj->ikh', xx, yy)
+        else:
+            raise ValueError("Distance implemented only for tensors of rank 2 and 3")
+
+        dxy = 1 + 2 * (xy / xxyy)
+
+        return torch.acosh(dxy)
 
     def pairwise_distance(self, query_emb, ref_emb):
         x = project(query_emb)
         y = project(ref_emb)
         xy = torch.nn.functional.pairwise_distance(x, y, p=self.p) ** self.p
-        # xx = 1 - torch.norm(x, dim=-1, p=self.p) ** self.p
-        # yy = 1 - torch.norm(y, dim=-1, p=self.p) ** self.p
-        #
-        # dxy = 1 + 2 * (xy / (xx*yy))
-        #
-        # return torch.acosh(dxy)
+        xx = 1 - torch.norm(x, dim=-1, p=self.p) ** self.p
+        yy = 1 - torch.norm(y, dim=-1, p=self.p) ** self.p
 
-        return xy
+        dxy = 1 + 2 * (xy / (xx*yy))
+
+        return torch.acosh(dxy)
 
 
-class PoincareDisk(BaseDistance):
+class HyperbolicLCA(BaseDistance):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.p = 2

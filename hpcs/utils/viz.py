@@ -10,6 +10,10 @@ from matplotlib.collections import LineCollection
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.cluster.hierarchy import dendrogram, fcluster, set_link_color_palette
 from sklearn.metrics.cluster import adjusted_rand_score as ri
+from matplotlib import cm
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+import seaborn as sns
 from scipy.sparse import find
 
 COLORS  = np.array(['#377eb8', '#ff7f00', '#4daf4a', '#a65628', '#f781bf', '#984ea3', '#999999', '#e41a1c', '#000000', '#dede00', '#116881', '#101a79', '#da55ba', '#5ac18e'])
@@ -208,6 +212,19 @@ def plot_clustering(X, y, idx=None, eps=1e-1):
     plt.ylim(X[:, 1].min() - eps, X[:, 1].max() + eps)
 
 
+def plot_tsne(X, y, idx=None, eps=1e-1):
+    tsne = TSNE(2, init='pca', verbose=0)
+    tsne_proj = tsne.fit_transform(X)
+    # Plot those points as a scatter plot and label them based on the pred labels
+    ec = COLORS[y % len(COLORS)]
+    plt.scatter(tsne_proj[:, 0], tsne_proj[:, 1], s=15, linewidths=1.5, c=lighten_color(ec), edgecolors=ec, alpha=0.9)
+    if idx is not None:
+        iec = COLORS[y[idx] % len(COLORS)]
+        plt.scatter(tsne_proj[idx, 0], tsne_proj[idx, 1], s=30, color=iec, marker='s', edgecolors='k')
+    plt.xlim(tsne_proj[:, 0].min() - eps, tsne_proj[:, 0].max() + eps)
+    plt.ylim(tsne_proj[:, 1].min() - eps, tsne_proj[:, 1].max() + eps)
+
+
 def plot_dendrogram(linkage_matrix, n_clusters=0, lastp=30):
     extra = {} if lastp is None else dict(truncate_mode='lastp', p=lastp)
     set_link_color_palette(list(COLORS))
@@ -292,11 +309,11 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, y_pred=
 
     idx += 1
     ax = plt.subplot(1, n_plots, idx)
-    plot_clustering(emb_hidden, y_pred)
+    plot_tsne(emb_hidden, y_pred)
     ax.set_title('Embedding')
     idx += 1
     ax = plt.subplot(1, n_plots, idx)
-    plot_clustering(emb_poincare, y_pred)
+    plot_tsne(emb_poincare, y_pred)
     # ax.set_xlim(-1 - 1e-1, 1 + 1e-1)
     # ax.set_ylim(-1 - 1e-1, 1 + 1e-1)
     ax.set_title('Poincaré')
@@ -451,7 +468,7 @@ def eval_noise(model, sample_gen, figname='', seed=0):
         plt.title("Embedding w/out rescaling")
         plt.subplot(len(noises), 5, n)
         n += 1
-        plot_clustering(model._rescale_emb(x_emb).detach(), y_pred)
+        plot_clustering(model.normalize_embeddings(x_emb).detach(), y_pred)
         plt.title(f"Embedding w Rescaling. {num_cluster} Clusters")
         plt.xlim(-1.1, 1.1)
         plt.ylim(-1.1, 1.1)

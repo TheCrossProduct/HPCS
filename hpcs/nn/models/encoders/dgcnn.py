@@ -38,20 +38,7 @@ class DGCNN(torch.nn.Module):
         )
 
 
-    def forward(self, data):
-        x = data.x
-        pos = data.pos
-        batch = data.batch
-
-        if self.transformer:
-            tr = self.tnet(x, batch=batch)
-
-            if batch is None:
-                x = torch.matmul(x, tr[0])
-            else:
-                batch_size = batch.max().item() + 1
-                x = torch.cat([torch.matmul(x[batch == i], tr[i]) for i in range(batch_size)])
-
+    def forward(self, pos, batch=None):
         # x = torch.cat([x, pos], dim=-1)
         x = pos
         x = self.conv1(x, batch=batch)

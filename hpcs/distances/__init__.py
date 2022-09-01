@@ -1,6 +1,6 @@
 __all__ = [
-    'PoincareBall',
-    'PoincareDisk'
+    'HyperbolicDistance',
+    'HyperbolicLCA'
 ]
 
-from .poincare import PoincareBall, PoincareDisk
+from .poincare import HyperbolicDistance, HyperbolicLCA
