@@ -25,7 +25,7 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
         self.temperature = temperature
         self.anneal = anneal
 
-        self.loss_triplet_sim = TripletMarginLoss(distance=self.distance_sim, margin=self.margin, triplets_per_anchor=1000)
+        self.loss_triplet_sim = TripletMarginLoss(distance=self.distance_sim, margin=self.margin, triplets_per_anchor=20000)
 
     def anneal(self):
         # TODO: review this function

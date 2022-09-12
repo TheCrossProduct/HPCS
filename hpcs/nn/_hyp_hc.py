@@ -100,73 +100,19 @@ class SimilarityHypHC(pl.LightningModule):
 
 
     def forward(self, data, decode=False):
-        points, label, targets = data
-
-        # trot = None
-        # rot = 'so3'
-        # if rot == 'z':
-        #     trot = RotateAxisAngle(angle=torch.rand(points.shape[0]) * 360, axis="Z", degrees=True)
-        # elif rot == 'so3':
-        #     trot = Rotate(R=random_rotations(points.shape[0]))
-        # if trot is not None:
-        #     points = trot.transform_points(points.cpu())
-        #
-        # points = points.detach().numpy()
-        # points = provider.random_point_dropout(points)
-        # points[:, :, 0:3] = provider.random_scale_point_cloud(points[:, :, 0:3])
-        # points[:, :, 0:3] = provider.shift_point_cloud(points[:, :, 0:3])
-        # points = torch.Tensor(points)
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        points, label, target = points.float().to(device), label.long().to(device), targets.long().to(device)
-        points = points.transpose(2, 1)
-
-        num_classes = 16
-        x_emb = self.model(points, to_categorical(label, num_classes))
-        x_emb_reshape = torch.reshape(x_emb, (x_emb.size(0) * x_emb.size(1), x_emb.size(2)))
-        x_poincare = project(self.scale * x_emb)
-        x_poincare_reshape = torch.reshape(x_poincare, (x_poincare.size(0) * x_poincare.size(1), x_poincare.size(2)))
-
-        # x_poincare = project(self.scale * points)
-        # x_emb = self.model(x_poincare, to_categorical(label, num_classes))
-        # x_emb = torch.reshape(x_emb, (x_emb.size(0) * x_emb.size(1), x_emb.size(2)))
-
-        x_feat_samples = x_poincare_reshape
-        y_samples = targets.view(-1, 1)[:, 0]
-
-        losses = self.triplet_loss.compute_loss(embeddings=x_feat_samples,
-                                                labels=y_samples,
-                                                indices_tuple=None,
-                                                ref_emb=None,
-                                                ref_labels=None,
-                                                t_per_anchor=1000)
-
-        loss_triplet = losses['loss_sim']['losses']
-        loss_hyphc = losses['loss_lca']['losses']
-
-        linkage_mat = []
-        if decode:
-            for i in range(points.size(0)):
-                Z = self._decode_linkage(x_poincare[i])
-                linkage_mat.append(Z)
-
-        return x_emb_reshape, x_poincare_reshape, loss_triplet, loss_hyphc, linkage_mat
-
-
-    def _forward(self, data, decode=False):
         points, label, targets = data
+        points, label, targets = points.float().to(device), label.long().to(device), targets.long().to(device)
 
         trot = None
         rot = 'so3'
         if rot == 'z':
-            trot = RotateAxisAngle(angle=torch.rand(points.shape[0]) * 360, axis="Z", degrees=True)
+            trot = RotateAxisAngle(angle=torch.rand(points.shape[0]) * 360, axis="Z", degrees=True, device=device)
         elif rot == 'so3':
-            trot = Rotate(R=random_rotations(points.shape[0]))
+            trot = Rotate(R=random_rotations(points.shape[0]), device=device)
         if trot is not None:
-            points = trot.transform_points(points.cpu())
-
-        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        points, label, targets = points.float().to(device), label.long().to(device), targets.long().to(device)
-        points = points.transpose(2, 1)
+            points = trot.transform_points(points)
+        points = points.permute(0, 2, 1)
 
         num_classes = 16
         x_emb = self.model(points, to_categorical(label, num_classes))
@@ -179,14 +125,14 @@ class SimilarityHypHC(pl.LightningModule):
         # x_emb = torch.reshape(x_emb, (x_emb.size(0) * x_emb.size(1), x_emb.size(2)))
 
         x_feat_samples = x_poincare_reshape
-        y_samples = targets.view(-1, 1)[:, 0]
+        y_samples = targets.view(-1, 1).squeeze()
 
         losses = self.triplet_loss.compute_loss(embeddings=x_feat_samples,
                                                 labels=y_samples,
                                                 indices_tuple=None,
                                                 ref_emb=None,
                                                 ref_labels=None,
-                                                t_per_anchor=1000)
+                                                t_per_anchor=100)
 
         loss_triplet = losses['loss_sim']['losses']
         loss_hyphc = losses['loss_lca']['losses']
@@ -197,7 +143,7 @@ class SimilarityHypHC(pl.LightningModule):
                 Z = self._decode_linkage(x_poincare[i])
                 linkage_mat.append(Z)
 
-        return x_emb_reshape, x_poincare_reshape, loss_triplet, loss_hyphc, linkage_mat
+        return x_emb_reshape, x_poincare_reshape, loss_triplet, loss_hyphc, linkage_mat, points, y_samples
 
 
     def configure_optimizers(self):
@@ -216,7 +162,7 @@ class SimilarityHypHC(pl.LightningModule):
         return [optim], scheduler
 
     def training_step(self, data, batch_idx):
-        x, x_poincare, loss_triplet, loss_hyphc, _ = self.forward(data)
+        x, x_poincare, loss_triplet, loss_hyphc, linkage_matrix, points, targets = self.forward(data)
         loss = loss_triplet + loss_hyphc
 
         self.log("train_loss", {"total_loss": loss, "triplet_loss": loss_triplet, "hyphc_loss": loss_hyphc})
@@ -231,19 +177,15 @@ class SimilarityHypHC(pl.LightningModule):
             print("Temperature Value: ", self.temperature)
 
     def validation_step(self, data, batch_idx):
-        x, x_poincare, val_loss_triplet, val_loss_hyphc, linkage_matrix = self.forward(data)
+        x, x_poincare, val_loss_triplet, val_loss_hyphc, linkage_matrix, points, targets = self.forward(data)
         val_loss = val_loss_triplet + val_loss_hyphc
 
         self.log("val_loss", val_loss)
         return {'val_loss': val_loss}
 
     def test_step(self, data, batch_idx):
-        x, x_poincare, test_loss_triplet, test_loss_hyphc, linkage_matrix = self.forward(data, decode=True)
+        x, x_poincare, test_loss_triplet, test_loss_hyphc, linkage_matrix, points, targets = self.forward(data, decode=True)
         test_loss = test_loss_hyphc + test_loss_triplet
-
-        points, label, targets = data
-        points = torch.reshape(points, (points.size(0) * points.size(1), points.size(2)))
-        targets = targets.view(-1, 1)[:, 0]
 
         y_pred_k, k, best_ri = get_optimal_k(targets.detach().cpu().numpy(), linkage_matrix[0])
         pu_score, nmi_score, ri_score = eval_clustering(y_true=targets.detach().cpu(), Z=linkage_matrix[0])
@@ -258,7 +200,7 @@ class SimilarityHypHC(pl.LightningModule):
                              show=True)
 
         # plot_cloud(xyz=data.pos.numpy(), scalars=y_pred_k, point_size=3.0, notebook=True)
-        plot_cloud(xyz=points.detach().cpu().numpy(), scalars=y_pred_k, point_size=3.0, notebook=True)
+        # plot_cloud(xyz=points.detach().cpu().numpy(), scalars=y_pred_k, point_size=3.0, notebook=True)
 
         n_clusters = targets.max() + 1
         y_pred = fcluster(linkage_matrix[0], n_clusters, criterion='maxclust') - 1

@@ -3,11 +3,8 @@ import argparse
 import os.path as osp
 import yaml
 
-import torch
-from torch.nn import DataParallel
 from torch.utils.data import DataLoader
 from data.ShapeNet.ShapeNetDataLoader import PartNormalDataset
-from collections import OrderedDict
 
 import wandb
 import pytorch_lightning as pl
@@ -78,7 +75,7 @@ def configure(config):
     embedding = args.embedding
 
 
-    category = None
+    category = 'Airplane'
     path = osp.join(osp.dirname(osp.realpath(__file__)), 'data', 'ShapeNet/raw')
 
     train_dataset = PartNormalDataset(root=path, npoints=fixed_points, split='train', class_choice=category)
@@ -159,18 +156,8 @@ def train(model, trainer, train_loader, valid_loader, test_loader):
     if os.path.exists('model.ckpt'):
         os.remove('model.ckpt')
 
-    if config.pretrained:
-        model_path = osp.realpath('model.partseg.vn_dgcnn.aligned.t7')
-        checkpoint = torch.load(model_path, map_location=torch.device('cpu'))
-        new_state_dict = OrderedDict()
-        for k, v in checkpoint.items():
-            name = k.replace("module.", "model.")
-            new_state_dict[name] = v
-        model = model.load_state_dict(new_state_dict, strict=False)
-        print(model)
-
     if config.resume:
-        wandb.restore('model.ckpt', root=os.getcwd(), run_path='pierreoo/HPCS/runs/xcosv2iq')
+        wandb.restore('model.ckpt', root=os.getcwd(), run_path='pierreoo/HPCS/runs/1u5h8w08')
         model = model.load_from_checkpoint('model.ckpt')
 
     trainer.fit(model, train_loader, valid_loader)
@@ -196,17 +183,16 @@ if __name__ == "__main__":
     # wandb.agent(sweep_id, function=sweep, count=1, project="HPCS")
 
     config = dict(
-        batch=6,
-        epochs=1,
+        batch=8,
+        epochs=2,
         lr=0.001,
         dropout=0.0,
-        fixed_points=256,
-        embedding=4,
+        fixed_points=500,
+        embedding=50,
         model="vn_dgcnn_partseg",
         dataset="shapenet",
-        gpu="",
-        pretrained=True,
-        resume=False,
+        gpu="0",
+        resume=True,
     )
 
     wandb.init(project='HPCS', config=config)

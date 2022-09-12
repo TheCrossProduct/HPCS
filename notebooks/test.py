@@ -82,9 +82,9 @@ def configure(config):
                             anneal_step=anneal_step)
 
 
-    trainer = pl.Trainer(accelerator='cpu',
+    trainer = pl.Trainer(gpus=gpu,
                          max_epochs=epochs,
-                         limit_test_batches=20,
+                         limit_test_batches=10,
                          )
 
     return model, trainer
