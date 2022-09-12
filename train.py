@@ -3,20 +3,21 @@ import argparse
 import os.path as osp
 import yaml
 
-import torch_geometric.transforms as T
-from torch_geometric.datasets import ShapeNet
-from torch_geometric.loader import DataLoader
+import torch
+from torch.nn import DataParallel
+from torch.utils.data import DataLoader
+from data.ShapeNet.ShapeNetDataLoader import PartNormalDataset
+from collections import OrderedDict
 
 import wandb
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
-from hpcs.nn.models._hyp_hc import SimilarityHypHC
-from hpcs.nn.models.encoders.dgcnn import DGCNN
-from hpcs.nn.models.encoders.dgcnn2 import DGCNN2
-from hpcs.nn.models.encoders.pointnet import PointNet
-from hpcs.nn.models.encoders.vndgcnn_source import VNDGCNN
+from hpcs.nn._hyp_hc import SimilarityHypHC
+from hpcs.nn.dgcnn import DGCNN_simple
+from hpcs.nn.dgcnn import DGCNN_partseg
+from hpcs.nn.dgcnn import VN_DGCNN_partseg
 
 
 # def sweep():
@@ -46,7 +47,6 @@ def configure(config):
     parser.add_argument('--epochs', default=config.epochs, type=int, help='number of epochs')
     parser.add_argument('--lr', default=config.lr, type=float, help='learning rate')
     parser.add_argument('--patience', default=50, type=int, help='patience value for early stopping')
-    parser.add_argument('--plot', default=-1, type=int, help='interval in which we plot prediction on validation batch')
     parser.add_argument('--gpu', default=config.gpu, type=str, help='use gpu')
     parser.add_argument('--distributed', help='if True run on a cluster machine', action='store_true')
     parser.add_argument('--num_workers', type=int, default=10)
@@ -72,25 +72,22 @@ def configure(config):
     batch = args.batch
     lr = args.lr
     patience = args.patience
-    plot_every = args.plot
     distr = args.distributed
     num_workers = args.num_workers
     fixed_points = args.fixed_points
     embedding = args.embedding
 
-    category = 'Airplane'  # Pass in `None` to train on all categories.
-    path = osp.join(osp.dirname(osp.realpath(__file__)), 'data', 'ShapeNet')
 
-    pre_transform, transform = T.NormalizeScale(), T.FixedPoints(fixed_points)
-    train_dataset = ShapeNet(path, category, split='train', transform=transform, pre_transform=pre_transform)
-    valid_dataset = ShapeNet(path, category, split='val', transform=transform, pre_transform=pre_transform)
-    test_dataset = ShapeNet(path, category, split='test', transform=transform, pre_transform=pre_transform)
-    test_dataset = test_dataset[0:20]
+    category = None
+    path = osp.join(osp.dirname(osp.realpath(__file__)), 'data', 'ShapeNet/raw')
 
+    train_dataset = PartNormalDataset(root=path, npoints=fixed_points, split='train', class_choice=category)
     train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers)
-    valid_loader = DataLoader(valid_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
+    valid_dataset = PartNormalDataset(root=path, npoints=fixed_points, split='val', class_choice=category)
+    valid_loader = DataLoader(valid_dataset, batch_size=batch, shuffle=False, num_workers=num_workers)
+    test_dataset = PartNormalDataset(root=path, npoints=fixed_points, split='test', class_choice=category)
     test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
-    
+
 
     if len(args.gpu):
         gpu = [int(g) for g in args.gpu.split(',')]
@@ -101,16 +98,12 @@ def configure(config):
 
 
     out_features = embedding
-    # todo parametrize this
-    if model_name == 'dgcnn':
-        nn = DGCNN(in_channels=3, hidden_features=hidden, out_features=out_features, k=k, transformer=False,
-                   dropout=dropout, negative_slope=negative_slope, cosine=cosine)
-    elif model_name == 'dgcnn2':
-        nn = DGCNN2(in_channels=6, out_channels=out_features, k=k, dropout=dropout)
-    elif model_name == 'pointnet':
-        nn = PointNet(in_channels=3, out_features=out_features)
-    elif model_name == 'vndgcnn':
-        nn = VNDGCNN(in_channels=3, out_features=out_features, k=k, dropout=dropout)
+    if model_name == 'dgcnn_simple':
+        nn = DGCNN_simple(in_channels=3, out_features=out_features, k=k, dropout=dropout)
+    elif model_name == 'dgcnn_partseg':
+        nn = DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout)
+    elif model_name == 'vn_dgcnn_partseg':
+        nn = VN_DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
 
 
     model = SimilarityHypHC(nn=nn,
@@ -118,13 +111,13 @@ def configure(config):
                             margin=margin,
                             temperature=temperature,
                             anneal=annealing,
-                            anneal_step=anneal_step,
-                            plot_every=plot_every)
+                            anneal_step=anneal_step)
+
 
     logger = WandbLogger(name=dataname, save_dir=os.path.join(logdir), project="HPCS", log_model=True)
     model_params = {'dataset': dataname,
                     'model': model_name,
-                    'k': k if model_name == 'dgcnn' else -1,
+                    'k': k,
                     'distance': distance,
                     'hidden': hidden,
                     'negative_slope': negative_slope,
@@ -140,6 +133,7 @@ def configure(config):
                     'fixed_points': fixed_points}
     print(model_params)
 
+
     savedir = os.path.join(logger.save_dir, logger.name, 'version_' + str(logger.version), 'checkpoints')
     checkpoint_callback = ModelCheckpoint(dirpath=savedir, verbose=True)
     early_stop_callback = EarlyStopping(
@@ -153,9 +147,8 @@ def configure(config):
                          max_epochs=epochs,
                          callbacks=[early_stop_callback, checkpoint_callback],
                          logger=logger,
-                         # limit_train_batches=100,
-                         # limit_test_batches=100,
-                         # track_grad_norm=2
+                         # limit_train_batches=500,
+                         limit_test_batches=25
                          )
 
     return model, trainer, train_loader, valid_loader, test_loader
@@ -166,8 +159,18 @@ def train(model, trainer, train_loader, valid_loader, test_loader):
     if os.path.exists('model.ckpt'):
         os.remove('model.ckpt')
 
+    if config.pretrained:
+        model_path = osp.realpath('model.partseg.vn_dgcnn.aligned.t7')
+        checkpoint = torch.load(model_path, map_location=torch.device('cpu'))
+        new_state_dict = OrderedDict()
+        for k, v in checkpoint.items():
+            name = k.replace("module.", "model.")
+            new_state_dict[name] = v
+        model = model.load_state_dict(new_state_dict, strict=False)
+        print(model)
+
     if config.resume:
-        wandb.restore('model.ckpt', root=os.getcwd(), run_path='pierreoo/HPCS/runs/xj3d1dc9')
+        wandb.restore('model.ckpt', root=os.getcwd(), run_path='pierreoo/HPCS/runs/xcosv2iq')
         model = model.load_from_checkpoint('model.ckpt')
 
     trainer.fit(model, train_loader, valid_loader)
@@ -193,15 +196,16 @@ if __name__ == "__main__":
     # wandb.agent(sweep_id, function=sweep, count=1, project="HPCS")
 
     config = dict(
-        batch=1,
+        batch=6,
         epochs=1,
-        lr=0.0001,
+        lr=0.001,
         dropout=0.0,
-        fixed_points=200,
-        embedding=100,
-        model="dgcnn",
+        fixed_points=256,
+        embedding=4,
+        model="vn_dgcnn_partseg",
         dataset="shapenet",
-        gpu="0",
+        gpu="",
+        pretrained=True,
         resume=False,
     )
 

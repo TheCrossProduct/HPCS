@@ -1,4 +1,4 @@
-"""Math util functions."""
+"""Math utils functions."""
 
 import torch
 

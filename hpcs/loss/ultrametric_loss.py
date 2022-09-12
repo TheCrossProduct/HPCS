@@ -13,20 +13,11 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
     def __init__(self, sim_distance: str = 'cosine', margin: float = 1.0, scale: float = 1e-3,
                  max_scale: float = 1. - 1e-3, temperature: float = 0.05, anneal: float = 0.5):
         super(TripletHyperbolicLoss, self).__init__()
-        # Triplet Loss on similarities between embeddings
+
         if sim_distance == 'cosine':
             self.distance_sim = CosineSimilarity()
-            # self.loss_triplet_sim = losses.TripletMarginLoss(distance=self.distance_sim, margin=self.margin)
-        elif sim_distance == 'hyperbolic':
-            self.distance_sim = hyp_lca()
-            # self.loss_triplet_sim = losses.TripletMarginLoss(distance=self.distance_sim, margin=self.margin)
         elif sim_distance == 'euclidean':
             self.distance_sim = LpDistance()
-            # self.loss_triplet_sim = losses.TripletMarginLoss(distance=self.distance_sim, margin=self.margin,
-            #                                                  embedding_regularizer=regularizers.LpRegularizer())
-        else:
-            raise ValueError(
-                f"The option {sim_distance} is not available for sim_distance. The only available are ['cosine', 'euclidean', 'hyperbolic'].")
 
         self.margin = margin
         self.scale = scale
@@ -34,8 +25,7 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
         self.temperature = temperature
         self.anneal = anneal
 
-        # distances to compute losses
-        self.loss_triplet_sim = TripletMarginLoss(distance=self.distance_sim, margin=self.margin)
+        self.loss_triplet_sim = TripletMarginLoss(distance=self.distance_sim, margin=self.margin, triplets_per_anchor=1000)
 
     def anneal(self):
         # TODO: review this function
@@ -77,7 +67,7 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
             wjk = torch.exp(-djk)
 
         # loss proposed by Chami et al.
-        sim_triplet = torch.stack([wij, wik, wjk]).T
+        sim_triplet = torch.stack([torch.exp(-dij), torch.exp(-dik), torch.exp(-djk)]).T    # [torch.exp(-dij), torch.exp(-dik), torch.exp(-djk)]
         lca_triplet = torch.stack([dij, dik, djk]).T
         weights = torch.softmax(lca_triplet / self.temperature, dim=-1)
 

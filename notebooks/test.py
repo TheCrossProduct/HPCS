@@ -2,11 +2,10 @@ import argparse
 
 import pytorch_lightning as pl
 
-from hpcs.nn.models._hyp_hc import SimilarityHypHC
-from hpcs.nn.models.encoders.dgcnn import DGCNN
-from hpcs.nn.models.encoders.dgcnn2 import DGCNN2
-from hpcs.nn.models.encoders.pointnet import PointNet
-from hpcs.nn.models.encoders.vndgcnn_source import VNDGCNN
+from hpcs.nn._hyp_hc import SimilarityHypHC
+from hpcs.nn.dgcnn import DGCNN_simple
+from hpcs.nn.dgcnn import DGCNN_partseg
+from hpcs.nn.dgcnn import VN_DGCNN_partseg
 
 
 def configure(config):
@@ -64,20 +63,15 @@ def configure(config):
         gpu = [int(g) for g in args.gpu.split(',')]
     else:
         gpu = 0
-    print("Distributed: ", distr)
     print("Gpu: ", gpu)
 
     out_features = embedding
-    # todo parametrize this
-    if model_name == 'dgcnn':
-        nn = DGCNN(in_channels=3, hidden_features=hidden, out_features=out_features, k=k, transformer=False,
-                   dropout=dropout, negative_slope=negative_slope, cosine=cosine)
-    elif model_name == 'dgcnn2':
-        nn = DGCNN2(in_channels=6, out_channels=out_features, k=k, dropout=dropout)
-    elif model_name == 'pointnet':
-        nn = PointNet(in_channels=3, out_features=out_features)
-    elif model_name == 'vndgcnn':
-        nn = VNDGCNN(in_channels=3, out_features=out_features, k=k, dropout=dropout)
+    if model_name == 'dgcnn_source':
+        nn = DGCNN_simple(in_channels=3, out_features=out_features, k=k, dropout=dropout)
+    elif model_name == 'dgcnn_partseg':
+        nn = DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout)
+    elif model_name == 'vn_dgcnn_partseg':
+        nn = VN_DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='max')
 
 
     model = SimilarityHypHC(nn=nn,
@@ -85,13 +79,12 @@ def configure(config):
                             margin=margin,
                             temperature=temperature,
                             anneal=annealing,
-                            anneal_step=anneal_step,
-                            plot_every=plot_every)
+                            anneal_step=anneal_step)
 
 
-    trainer = pl.Trainer(gpus=gpu,
+    trainer = pl.Trainer(accelerator='cpu',
                          max_epochs=epochs,
-                         # limit_test_batches=100,
+                         limit_test_batches=20,
                          )
 
     return model, trainer

@@ -10,10 +10,8 @@ from matplotlib.collections import LineCollection
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.cluster.hierarchy import dendrogram, fcluster, set_link_color_palette
 from sklearn.metrics.cluster import adjusted_rand_score as ri
-from matplotlib import cm
-from sklearn.decomposition import PCA
+
 from sklearn.manifold import TSNE
-import seaborn as sns
 from scipy.sparse import find
 
 COLORS  = np.array(['#377eb8', '#ff7f00', '#4daf4a', '#a65628', '#f781bf', '#984ea3', '#999999', '#e41a1c', '#000000', '#dede00', '#116881', '#101a79', '#da55ba', '#5ac18e'])
