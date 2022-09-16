@@ -3,7 +3,7 @@ import wandb
 import torch
 import numpy as np
 import pytorch_lightning as pl
-from typing import Union
+from typing import Optional
 
 from scipy.cluster.hierarchy import fcluster, linkage
 
@@ -74,21 +74,25 @@ class SimilarityHypHC(pl.LightningModule):
         super(SimilarityHypHC, self).__init__()
         self.save_hyperparameters()
         self.model = nn
-
-        self.scale = torch.nn.Parameter(torch.Tensor([init_rescale]), requires_grad=True)
-
-        self.triplet_loss = TripletHyperbolicLoss(sim_distance=sim_distance,
-                                                  margin=margin,
-                                                  scale=self.scale,
-                                                  max_scale=max_scale,
-                                                  temperature=temperature,
-                                                  anneal=anneal)
-
+        self.sim_distance = sim_distance
+        self.temperature = temperature
+        self.anneal = anneal
+        self.anneal_step = anneal_step
+        self.margin = margin
+        self.max_scale = max_scale
         self.lr = lr
         self.patience = patience
         self.factor = factor
         self.min_lr = min_lr
-        self.anneal_step = anneal_step
+
+        self.scale = torch.nn.Parameter(torch.Tensor([init_rescale]), requires_grad=True)
+
+        self.triplet_loss = TripletHyperbolicLoss(sim_distance=self.sim_distance,
+                                                  margin=self.margin,
+                                                  scale=self.scale,
+                                                  max_scale=self.max_scale,
+                                                  temperature=self.temperature,
+                                                  anneal=self.anneal)
 
     def _decode_linkage(self, leaves_embeddings):
         """Build linkage matrix from leaves' embeddings. Assume points are normalized to same radius."""
@@ -107,11 +111,17 @@ class SimilarityHypHC(pl.LightningModule):
         trot = None
         rot = 'so3'
         if rot == 'z':
-            trot = RotateAxisAngle(angle=torch.rand(points.shape[0]) * 360, axis="Z", degrees=True, device=device)
+            trot = RotateAxisAngle(angle=torch.rand(points.shape[0]) * 360, axis="Z", degrees=True)
         elif rot == 'so3':
-            trot = Rotate(R=random_rotations(points.shape[0]), device=device)
+            trot = Rotate(R=random_rotations(points.shape[0]))
         if trot is not None:
-            points = trot.transform_points(points)
+            points = trot.transform_points(points.cpu())
+        points = points.data.numpy()
+        points[:, :, 0:3] = provider.random_scale_point_cloud(points[:, :, 0:3])
+        points[:, :, 0:3] = provider.shift_point_cloud(points[:, :, 0:3])
+        points = torch.Tensor(points)
+        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        points, label, targets = points.float().to(device), label.long().to(device), targets.long().to(device)
         points = points.permute(0, 2, 1)
 
         num_classes = 16
