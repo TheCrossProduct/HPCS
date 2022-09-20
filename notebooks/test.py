@@ -6,6 +6,7 @@ from hpcs.nn._hyp_hc import SimilarityHypHC
 from hpcs.nn.dgcnn import DGCNN_simple
 from hpcs.nn.dgcnn import DGCNN_partseg
 from hpcs.nn.dgcnn import VN_DGCNN_partseg
+from hpcs.nn.dgcnn import VN_DGCNN_partseg_encoder
 
 
 def configure(config):
@@ -66,12 +67,14 @@ def configure(config):
     print("Gpu: ", gpu)
 
     out_features = embedding
-    if model_name == 'dgcnn_source':
+    if model_name == 'dgcnn_simple':
         nn = DGCNN_simple(in_channels=3, out_features=out_features, k=k, dropout=dropout)
     elif model_name == 'dgcnn_partseg':
         nn = DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout)
     elif model_name == 'vn_dgcnn_partseg':
-        nn = VN_DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='max')
+        nn = VN_DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
+    elif model_name == 'vn_dgcnn_partseg_class':
+        nn = VN_DGCNN_partseg_encoder(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
 
 
     model = SimilarityHypHC(nn=nn,

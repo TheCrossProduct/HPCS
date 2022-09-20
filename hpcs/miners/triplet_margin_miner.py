@@ -1,0 +1,44 @@
+from pytorch_metric_learning import miners
+from pytorch_metric_learning.utils import loss_and_miner_utils as lmu
+
+import torch
+from hpcs.distances.lca import hyp_lca
+
+
+class RandomHypTripletMarginMiner(miners.TripletMarginMiner):
+    def __init__(self, t_per_anchor, margin=0.2, type_of_triplets="all", **kwargs):
+        super().__init__(margin=margin, type_of_triplets=type_of_triplets, **kwargs)
+        self.t_per_anchor = t_per_anchor
+
+
+    def mine(self, embeddings, labels, ref_emb, ref_labels):
+        anchor_idx, positive_idx, negative_idx = lmu.convert_to_triplets(None, labels, t_per_anchor=self.t_per_anchor)
+        # mat = self.distance(embeddings, ref_emb)
+        # ap_dist = mat[anchor_idx, positive_idx]
+        # an_dist = mat[anchor_idx, negative_idx]
+        e1 = embeddings[anchor_idx]
+        e2 = embeddings[positive_idx]
+        e3 = embeddings[negative_idx]
+        ap_dist = hyp_lca(e1, e2, return_coord=False)
+        an_dist = hyp_lca(e1, e3, return_coord=False)
+
+        triplet_margin = (
+            ap_dist - an_dist if self.distance.is_inverted else an_dist - ap_dist
+        )
+
+        triplet_margin = torch.flatten(triplet_margin)
+
+        if self.type_of_triplets == "easy":
+            threshold_condition = triplet_margin > self.margin
+        else:
+            threshold_condition = triplet_margin <= self.margin
+            if self.type_of_triplets == "hard":
+                threshold_condition &= triplet_margin <= 0
+            elif self.type_of_triplets == "semihard":
+                threshold_condition &= triplet_margin > 0
+
+        return (
+            anchor_idx[threshold_condition],
+            positive_idx[threshold_condition],
+            negative_idx[threshold_condition],
+        )

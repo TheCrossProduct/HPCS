@@ -4,6 +4,7 @@ import os.path as osp
 import yaml
 
 import torch
+from collections import OrderedDict
 from torch.utils.data import DataLoader
 from data.ShapeNet.ShapeNetDataLoader import PartNormalDataset
 
@@ -16,7 +17,7 @@ from hpcs.nn._hyp_hc import SimilarityHypHC
 from hpcs.nn.dgcnn import DGCNN_simple
 from hpcs.nn.dgcnn import DGCNN_partseg
 from hpcs.nn.dgcnn import VN_DGCNN_partseg
-from hpcs.nn.dgcnn import VN_DGCNN_partseg_class
+from hpcs.nn.dgcnn import VN_DGCNN_partseg_encoder
 
 
 # def sweep():
@@ -77,7 +78,7 @@ def configure(config):
     embedding = args.embedding
 
 
-    category = None
+    category = 'Airplane'
     path = osp.join(osp.dirname(osp.realpath(__file__)), 'data', 'ShapeNet/raw')
 
     train_dataset = PartNormalDataset(root=path, npoints=fixed_points, split='train', class_choice=category)
@@ -103,13 +104,17 @@ def configure(config):
         nn = DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout)
     elif model_name == 'vn_dgcnn_partseg':
         nn = VN_DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
-    elif model_name == 'vn_dgcnn_partseg_class':
-        nn = VN_DGCNN_partseg_class(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
+    elif model_name == 'vn_dgcnn_partseg_encoder':
+        nn = VN_DGCNN_partseg_encoder(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
 
     if config.pretrained:
         model_path = osp.realpath('model.partseg.vn_dgcnn.aligned.t7')
         checkpoint = torch.load(model_path)
-        nn = nn.load_state_dict(checkpoint)
+        new_state_dict = OrderedDict()
+        for k, v in checkpoint.items():
+            name = k.replace("module.", "")
+            new_state_dict[name] = v
+        nn.load_state_dict(new_state_dict, strict=False)
 
 
     model = SimilarityHypHC(nn=nn,
@@ -192,12 +197,12 @@ if __name__ == "__main__":
     # wandb.agent(sweep_id, function=sweep, count=1, project="HPCS")
 
     config = dict(
-        batch=12,
-        epochs=5,
-        lr=0.001,
+        batch=6,
+        epochs=15,
+        lr=0.0001,
         dropout=0.0,
-        fixed_points=512,
-        embedding=150,
+        fixed_points=1024,
+        embedding=4,
         model="vn_dgcnn_partseg",
         dataset="shapenet",
         gpu="0",

@@ -5,8 +5,8 @@ from pytorch_metric_learning.losses import BaseMetricLossFunction, TripletMargin
 from pytorch_metric_learning.distances import CosineSimilarity, LpDistance
 from pytorch_metric_learning.utils import loss_and_miner_utils as lmu
 from pytorch_metric_learning import miners, losses
-from hpcs.miners.triplet_margin_miner import RandomTripletMarginMiner
-from hpcs.miners.triplet_margin_loss import PreventionTripletMarginLoss
+from hpcs.miners.triplet_margin_miner import RandomHypTripletMarginMiner
+from hpcs.miners.triplet_margin_loss import HypTripletMarginLoss
 
 from hpcs.distances.lca import hyp_lca
 
@@ -26,9 +26,9 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
         elif sim_distance == 'euclidean':
             self.distance_sim = LpDistance()
 
-        self.miner = RandomTripletMarginMiner(distance=CosineSimilarity(), margin=0, t_per_anchor=200, type_of_triplets='hard')
+        self.miner = RandomHypTripletMarginMiner(margin=0, t_per_anchor=1000, type_of_triplets='hard')
 
-        self.loss_triplet_sim = PreventionTripletMarginLoss(distance=CosineSimilarity(), margin=0.05)
+        self.loss_triplet_sim = HypTripletMarginLoss(margin=0.05)
 
     def anneal_temperature(self):
         max_temp = 0.8
@@ -76,7 +76,7 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
             wjk = torch.exp(-djk)
 
         # loss proposed by Chami et al.
-        sim_triplet = torch.stack([wij, wik, wjk]).T    # [torch.exp(-dij), torch.exp(-dik), torch.exp(-djk)]
+        sim_triplet = torch.stack([torch.exp(-dij), torch.exp(-dik), torch.exp(-djk)]).T    # [torch.exp(-dij), torch.exp(-dik), torch.exp(-djk)]
         lca_triplet = torch.stack([dij, dik, djk]).T
         weights = torch.softmax(lca_triplet / self.temperature, dim=-1)
 
