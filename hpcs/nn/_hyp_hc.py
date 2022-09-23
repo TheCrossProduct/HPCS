@@ -87,12 +87,12 @@ class SimilarityHypHC(pl.LightningModule):
 
         self.scale = torch.nn.Parameter(torch.Tensor([init_rescale]), requires_grad=True)
 
-        self.triplet_loss = TripletHyperbolicLoss(sim_distance=self.sim_distance,
-                                                  margin=self.margin,
+        self.triplet_loss = TripletHyperbolicLoss(sim_distance=sim_distance,
+                                                  margin=margin,
                                                   scale=self.scale,
-                                                  max_scale=self.max_scale,
-                                                  temperature=self.temperature,
-                                                  anneal=self.anneal)
+                                                  max_scale=max_scale,
+                                                  temperature=temperature,
+                                                  anneal=anneal)
 
     def _decode_linkage(self, leaves_embeddings):
         """Build linkage matrix from leaves' embeddings. Assume points are normalized to same radius."""
@@ -128,6 +128,7 @@ class SimilarityHypHC(pl.LightningModule):
         x_emb = self.model(points, to_categorical(label, num_classes))
         x_emb_reshape = torch.reshape(x_emb, (x_emb.size(0) * x_emb.size(1), x_emb.size(2)))
         x_poincare = project(self.scale * x_emb)
+        # print(self.scale)
         x_poincare_reshape = torch.reshape(x_poincare, (x_poincare.size(0) * x_poincare.size(1), x_poincare.size(2)))
 
         # x_poincare = project(self.scale * points)
@@ -142,7 +143,7 @@ class SimilarityHypHC(pl.LightningModule):
                                                 indices_tuple=None,
                                                 ref_emb=None,
                                                 ref_labels=None,
-                                                t_per_anchor=100)
+                                                t_per_anchor=1000)
 
         loss_triplet = losses['loss_sim']['losses']
         loss_hyphc = losses['loss_lca']['losses']
@@ -181,9 +182,7 @@ class SimilarityHypHC(pl.LightningModule):
     def training_epoch_end(self, outputs):
         if self.current_epoch and self.anneal_step > 0 and self.current_epoch % self.anneal_step == 0:
             print(f"Annealing temperature at the end of epoch {self.current_epoch}")
-            max_temp = 0.8
-            min_temp = 0.01
-            self.temperature = max(min(self.temperature * self.anneal, max_temp), min_temp)
+            self.temperature = self.triplet_loss.anneal_temperature()
             print("Temperature Value: ", self.temperature)
 
     def validation_step(self, data, batch_idx):

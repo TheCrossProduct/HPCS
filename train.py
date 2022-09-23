@@ -40,9 +40,9 @@ def configure(config):
     parser.add_argument('--cosine', help='if True add use cosine dist in DynamicEdgeConv', action='store_true')
     parser.add_argument('--distance', default='cosine', type=str, help='distance to use to compute triplets')
     parser.add_argument('--margin', default=1.0, type=float, help='margin value to use in triplet loss')
-    parser.add_argument('--temperature', default=0.01, type=float, help='rescale softmax value used in the hyphc loss')
-    parser.add_argument('--annealing', default=1.0, type=float, help='annealing factor')
-    parser.add_argument('--anneal_step', default=20, type=int, help='use annealing each n step')
+    parser.add_argument('--temperature', default=0.8, type=float, help='rescale softmax value used in the hyphc loss')
+    parser.add_argument('--annealing', default=0.5, type=float, help='annealing factor')
+    parser.add_argument('--anneal_step', default=5, type=int, help='use annealing each n step')
     parser.add_argument('--batch', default=config.batch, type=int, help='batch size')
     parser.add_argument('--epochs', default=config.epochs, type=int, help='number of epochs')
     parser.add_argument('--lr', default=config.lr, type=float, help='learning rate')
@@ -171,7 +171,7 @@ def train(model, trainer, train_loader, valid_loader, test_loader):
         os.remove('model.ckpt')
 
     if config.resume:
-        wandb.restore('model.ckpt', root=os.getcwd(), run_path='pierreoo/HPCS/runs/ckz23kji')
+        wandb.restore('model.ckpt', root=os.getcwd(), run_path='pierreoo/HPCS/runs/1ppiy4rc')
         model = model.load_from_checkpoint('model.ckpt')
 
     trainer.fit(model, train_loader, valid_loader)
@@ -197,17 +197,17 @@ if __name__ == "__main__":
     # wandb.agent(sweep_id, function=sweep, count=1, project="HPCS")
 
     config = dict(
-        batch=6,
-        epochs=15,
+        batch=32,
+        epochs=30,
         lr=0.0001,
         dropout=0.0,
-        fixed_points=1024,
+        fixed_points=256,
         embedding=4,
         model="vn_dgcnn_partseg",
         dataset="shapenet",
         gpu="0",
         resume=False,
-        pretrained=True,
+        pretrained=False,
     )
 
     wandb.init(project='HPCS', config=config)
