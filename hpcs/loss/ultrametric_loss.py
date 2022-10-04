@@ -1,3 +1,4 @@
+import pytorch_lightning
 import torch
 from torch.nn import functional as F
 import numpy as np
@@ -26,24 +27,22 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
         elif sim_distance == 'euclidean':
             self.distance_sim = LpDistance()
 
-        self.hyp_miner = RandomTripletMarginMiner(distance=CosineSimilarity(), margin=0, t_per_anchor=500, type_of_triplets='easy')
-        self.triplet_miner = RandomTripletMarginMiner(distance=CosineSimilarity(), margin=0, t_per_anchor=1000, type_of_triplets='hard')
+        self.hyp_miner = RandomTripletMarginMiner(distance=CosineSimilarity(), margin=0, t_per_anchor=100, type_of_triplets='easy')
+        self.triplet_miner = RandomTripletMarginMiner(distance=CosineSimilarity(), margin=0, t_per_anchor=200, type_of_triplets='hard')
 
         self.loss_triplet_sim = TripletMarginLoss(distance=CosineSimilarity(), margin=0.05)
 
     def anneal_temperature(self):
-        max_temp = 0.8
-        min_temp = 0.01
-        self.temperature = max(min(self.temperature * self.anneal, max_temp), min_temp)
+        self.temperature *= self.anneal
         return self.temperature
 
     def normalize_embeddings(self, embeddings):
         """Normalize leaves embeddings to have the lie on a diameter."""
         min_scale = 1e-2
         max_scale = self.max_scale
-        return F.normalize(embeddings, p=2, dim=1) * self.scale.clamp_min(min_scale).clamp_max(max_scale)
+        return F.normalize(embeddings, p=2, dim=1) * self.scale
 
-    def compute_loss(self, embeddings, labels, indices_tuple, ref_emb, ref_labels, t_per_anchor=100):
+    def compute_loss(self, embeddings, labels, indices_tuple, ref_emb, ref_labels, t_per_anchor):
         triplet_indices_tuple = self.triplet_miner(embeddings, labels)
         hyp_indices_tuple = self.hyp_miner(embeddings, labels)
 
@@ -66,16 +65,12 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
             wij = mat_sim[anchor_idx, positive_idx]
             wik = mat_sim[anchor_idx, negative_idx]
             wjk = mat_sim[positive_idx, negative_idx]
-        else:
-            wij = torch.exp(-dij)
-            wik = torch.exp(-dik)
-            wjk = torch.exp(-djk)
 
         # print(self.temperature)
         # loss proposed by Chami et al.
         sim_triplet = torch.stack([wij, wik, wjk]).T    # [torch.exp(-dij), torch.exp(-dik), torch.exp(-djk)]
         lca_triplet = torch.stack([dij, dik, djk]).T
-        weights = torch.softmax(lca_triplet / self.temperature, dim=-1)
+        weights = torch.softmax(lca_triplet / 0.01, dim=-1)
 
         w_ord = torch.sum(sim_triplet * weights, dim=-1, keepdim=True)
         total = torch.sum(sim_triplet, dim=-1, keepdim=True) - w_ord

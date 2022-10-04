@@ -17,6 +17,7 @@ from hpcs.nn._hyp_hc import SimilarityHypHC
 from hpcs.nn.dgcnn import DGCNN_simple
 from hpcs.nn.dgcnn import DGCNN_partseg
 from hpcs.nn.dgcnn import VN_DGCNN_partseg
+from hpcs.nn.dgcnn import VN_DGCNN_partseg_class
 from hpcs.nn.dgcnn import VN_DGCNN_partseg_encoder
 
 
@@ -33,16 +34,16 @@ def configure(config):
     parser.add_argument('--logdir', default='logs', type=str, help='dirname for logs')
     parser.add_argument('--data', default=config.dataset, type=str, help='name of dataset to use')
     parser.add_argument('--model', default=config.model, type=str, help='model to use to extract features')
-    parser.add_argument('--k', default=40, type=int, help='if model dgcnn, k is the number of neigh to take into account')
+    parser.add_argument('--k', default=10, type=int, help='if model dgcnn, k is the number of neigh to take into account')
     parser.add_argument('--hidden', default=64, type=int, help='number of hidden features')
     parser.add_argument('--negative_slope', default=0.2, type=float, help='negative slope for leaky relu in the feature extractor')
     parser.add_argument('--dropout', default=config.dropout, type=float, help='dropout in the feature extractor')
     parser.add_argument('--cosine', help='if True add use cosine dist in DynamicEdgeConv', action='store_true')
     parser.add_argument('--distance', default='cosine', type=str, help='distance to use to compute triplets')
     parser.add_argument('--margin', default=1.0, type=float, help='margin value to use in triplet loss')
-    parser.add_argument('--temperature', default=0.8, type=float, help='rescale softmax value used in the hyphc loss')
+    parser.add_argument('--temperature', default=config.temperature, type=float, help='rescale softmax value used in the hyphc loss')
     parser.add_argument('--annealing', default=0.5, type=float, help='annealing factor')
-    parser.add_argument('--anneal_step', default=5, type=int, help='use annealing each n step')
+    parser.add_argument('--anneal_step', default=10, type=int, help='use annealing each n step')
     parser.add_argument('--batch', default=config.batch, type=int, help='batch size')
     parser.add_argument('--epochs', default=config.epochs, type=int, help='number of epochs')
     parser.add_argument('--lr', default=config.lr, type=float, help='learning rate')
@@ -104,6 +105,8 @@ def configure(config):
         nn = DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout)
     elif model_name == 'vn_dgcnn_partseg':
         nn = VN_DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
+    elif model_name == 'vn_dgcnn_partseg_class':
+        nn = VN_DGCNN_partseg_class(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
     elif model_name == 'vn_dgcnn_partseg_encoder':
         nn = VN_DGCNN_partseg_encoder(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
 
@@ -158,7 +161,7 @@ def configure(config):
                          max_epochs=epochs,
                          callbacks=[early_stop_callback, checkpoint_callback],
                          logger=logger,
-                         # limit_train_batches=500,
+                         limit_train_batches=50,
                          limit_test_batches=25
                          )
 
@@ -171,7 +174,7 @@ def train(model, trainer, train_loader, valid_loader, test_loader):
         os.remove('model.ckpt')
 
     if config.resume:
-        wandb.restore('model.ckpt', root=os.getcwd(), run_path='pierreoo/HPCS/runs/1ppiy4rc')
+        wandb.restore('model.ckpt', root=os.getcwd(), run_path='pierreoo/HPCS/runs/36yyycb5')
         model = model.load_from_checkpoint('model.ckpt')
 
     trainer.fit(model, train_loader, valid_loader)
@@ -197,16 +200,17 @@ if __name__ == "__main__":
     # wandb.agent(sweep_id, function=sweep, count=1, project="HPCS")
 
     config = dict(
-        batch=32,
-        epochs=30,
+        batch=24,
+        epochs=50,
         lr=0.0001,
+        temperature=0.8,
         dropout=0.0,
-        fixed_points=256,
+        fixed_points=1024,
         embedding=4,
         model="vn_dgcnn_partseg",
         dataset="shapenet",
         gpu="0",
-        resume=False,
+        resume=True,
         pretrained=False,
     )
 

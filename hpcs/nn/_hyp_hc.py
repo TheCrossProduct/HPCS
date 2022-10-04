@@ -14,10 +14,13 @@ from torch_geometric.data import Batch
 # from torchmetrics.functional import accuracy
 from sklearn.metrics.cluster import adjusted_rand_score as ri
 
-from hpcs.utils.viz import plot_hyperbolic_eval, plot_cloud
+from hpcs.utils.viz import plot_hyperbolic_eval, plot_cloud, plot_clustering
 from hpcs.utils.scores import eval_clustering, get_optimal_k
 from hpcs.loss.ultrametric_loss import TripletHyperbolicLoss
+from pytorch_metric_learning.distances import CosineSimilarity
+from hpcs.miners.triplet_margin_miner import RandomTripletMarginMiner
 from hpcs.distances.poincare import project
+from hpcs.distances.lca import hyp_lca
 
 from hpcs.optim import RAdam
 
@@ -85,6 +88,7 @@ class SimilarityHypHC(pl.LightningModule):
         self.factor = factor
         self.min_lr = min_lr
 
+        # self.temperature = torch.nn.Parameter(torch.Tensor([temperature]), requires_grad=True)
         self.scale = torch.nn.Parameter(torch.Tensor([init_rescale]), requires_grad=True)
 
         self.triplet_loss = TripletHyperbolicLoss(sim_distance=sim_distance,
@@ -103,7 +107,7 @@ class SimilarityHypHC(pl.LightningModule):
         return Z
 
 
-    def forward(self, data, decode=False):
+    def forward(self, data, decode=False, augmentation=False):
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         points, label, targets = data
         points, label, targets = points.float().to(device), label.long().to(device), targets.long().to(device)
@@ -117,8 +121,9 @@ class SimilarityHypHC(pl.LightningModule):
         if trot is not None:
             points = trot.transform_points(points.cpu())
         points = points.data.numpy()
-        points[:, :, 0:3] = provider.random_scale_point_cloud(points[:, :, 0:3])
-        points[:, :, 0:3] = provider.shift_point_cloud(points[:, :, 0:3])
+        if augmentation:
+            points[:, :, 0:3] = provider.random_scale_point_cloud(points[:, :, 0:3])
+            points[:, :, 0:3] = provider.shift_point_cloud(points[:, :, 0:3])
         points = torch.Tensor(points)
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         points, label, targets = points.float().to(device), label.long().to(device), targets.long().to(device)
@@ -128,8 +133,7 @@ class SimilarityHypHC(pl.LightningModule):
         x_emb = self.model(points, to_categorical(label, num_classes))
         x_emb_reshape = torch.reshape(x_emb, (x_emb.size(0) * x_emb.size(1), x_emb.size(2)))
         x_poincare = project(self.scale * x_emb)
-        # print(self.scale)
-        x_poincare_reshape = torch.reshape(x_poincare, (x_poincare.size(0) * x_poincare.size(1), x_poincare.size(2)))
+        x_poincare_reshape = project(self.scale * x_emb_reshape)
 
         # x_poincare = project(self.scale * points)
         # x_emb = self.model(x_poincare, to_categorical(label, num_classes))
@@ -177,6 +181,8 @@ class SimilarityHypHC(pl.LightningModule):
         loss = loss_triplet + loss_hyphc
 
         self.log("train_loss", {"total_loss": loss, "triplet_loss": loss_triplet, "hyphc_loss": loss_hyphc})
+        self.log("scale", self.scale)
+        self.log("temperature", self.temperature)
         return {'loss': loss, 'progress_bar': {'triplet': loss_triplet, 'hyphc': loss_hyphc}}
 
     def training_epoch_end(self, outputs):
@@ -192,7 +198,7 @@ class SimilarityHypHC(pl.LightningModule):
         self.log("val_loss", val_loss)
         return {'val_loss': val_loss}
 
-    def test_step(self, data, batch_idx):
+    def test_step(self, data, batch_idx, triplet_heat_map=False):
         x, x_poincare, test_loss_triplet, test_loss_hyphc, linkage_matrix, points, targets = self.forward(data, decode=True)
         test_loss = test_loss_hyphc + test_loss_triplet
 
@@ -208,64 +214,77 @@ class SimilarityHypHC(pl.LightningModule):
                              k=k,
                              show=True)
 
-        # plot_cloud(xyz=data.pos.numpy(), scalars=y_pred_k, point_size=3.0, notebook=True)
-        # plot_cloud(xyz=points.detach().cpu().numpy(), scalars=y_pred_k, point_size=3.0, notebook=True)
+        if triplet_heat_map:
+            easy_miner = RandomTripletMarginMiner(distance=CosineSimilarity(), margin=0, t_per_anchor=10000, type_of_triplets='easy')
+            hard_miner = RandomTripletMarginMiner(distance=CosineSimilarity(), margin=0, t_per_anchor=10000, type_of_triplets='hard')
+            easy_indices_tuple = easy_miner(x_poincare, targets)
+            hard_indices_tuple = hard_miner(x_poincare, targets)
+            anchor_easy, positive_easy, negative_easy = easy_indices_tuple
+            anchor_hard, positive_hard, negative_hard = hard_indices_tuple
 
-        n_clusters = targets.max() + 1
-        y_pred = fcluster(linkage_matrix[0], n_clusters, criterion='maxclust') - 1
-        ri_score = ri(targets.detach().cpu().numpy(), y_pred)
+            scalar = torch.zeros(len(targets))
+            base = torch.where(targets == 3)[0]
+            outputs = []
+            for i in base:
+                indices = torch.where(anchor_hard == i)[0]
+                outputs.append(indices)
+            if outputs:
+                triplets = outputs[0]
+                anchor = anchor_hard[triplets]
+                positive = positive_hard[triplets]
+                negative = negative_hard[triplets]
+                e1 = x_poincare[anchor]
+                e2 = x_poincare[positive]
+                e3 = x_poincare[negative]
+                e1 = self.triplet_loss.normalize_embeddings(e1)
+                e2 = self.triplet_loss.normalize_embeddings(e2)
+                e3 = self.triplet_loss.normalize_embeddings(e3)
+                dij = hyp_lca(e1, e2, return_coord=False)
+                dik = hyp_lca(e1, e3, return_coord=False)
+                scalar[anchor] = int(4)
+                scalar[positive] = torch.flatten(dij)
+                scalar[negative] = torch.flatten(dik)
+                points_reshaped = torch.reshape(points, (points.size(1), points.size(2)))
+                points_transpose = torch.transpose(points_reshaped, 0, 1)
+                plot_cloud(xyz=points_transpose.numpy(), scalars=scalar, point_size=5.0)
 
-        # self.logger.experiment.add_scalar("Loss/Test", test_loss, batch_idx)
-        # self.logger.experiment.add_scalar("RandScore/Test", best_ri, batch_idx)
-        # # self.logger.experiment.add_scalar("AccScore@k/Test", acc_score,  batch_idx)
-        # self.logger.experiment.add_scalar("PurityScore@k/Test", pu_score, batch_idx)
-        # self.logger.experiment.add_scalar("NMIScore@k/Test", nmi_score, batch_idx)
-        # self.logger.experiment.add_scalar("RandScore@k/Test", ri_score, batch_idx)
-
-        tag = batch_idx // 10
-        step = batch_idx % 10
-        # self.logger.experiment.add_figure(f"Plots/Test:{tag}", figure=fig, global_step=step)
-        # self.logger.log_metrics({'ari@k': ri_score, 'purity@k': pu_score, 'nmi@k': nmi_score,
-        #                          'ari': best_ri, 'best_k': k}, step=batch_idx)
-
-
-        self.log("test_loss", test_loss, batch_size=points.shape[0], on_step=False, on_epoch=True)
+        self.log("test_loss", test_loss)
         return {'test_loss': test_loss}
                 # 'test_ri@k': torch.tensor(ri_score),
                 # 'test_pu@k': torch.tensor(pu_score), 'test_nmi@k': torch.tensor(nmi_score),
                 # 'test_ri': torch.tensor(best_ri), 'k': torch.tensor(k, dtype=torch.float)}
 
-    def test_epoch_end(self, outputs):
-
-        avg_loss = torch.stack([x['test_loss'] for x in outputs]).mean()
-        # avg_ri_k = torch.stack([x['test_ri@k'] for x in outputs]).mean()
-        # std_ri_k = torch.stack([x['test_ri@k'] for x in outputs]).std()
-        # # avg_acc_k = torch.stack([x['test_acc@k'] for x in outputs]).mean()
-        # # std_acc_k = torch.stack([x['test_acc@k'] for x in outputs]).std()
-        # avg_pu_k = torch.stack([x['test_pu@k'] for x in outputs]).mean()
-        # std_pu_k = torch.stack([x['test_pu@k'] for x in outputs]).std()
-        # avg_nmi_k = torch.stack([x['test_nmi@k'] for x in outputs]).mean()
-        # std_nmi_k = torch.stack([x['test_nmi@k'] for x in outputs]).std()
-        # avg_ri = torch.stack([x['test_ri'] for x in outputs]).mean()
-        # std_ri = torch.stack([x['test_ri'] for x in outputs]).std()
-        # avg_best_k = torch.stack([x['k'] for x in outputs]).mean()
-        # std_best_k = torch.stack([x['k'] for x in outputs]).std()
-
-        # predictions = torch.from_numpy(np.stack([x['prediction'] for x in outputs]))
-
-        # metrics = {'ari@k': avg_ri_k, 'ari@k-std': std_ri_k,
-        #            # 'acc@k': avg_acc_k, 'acc@k-std': std_acc_k,
-        #            'purity@k': avg_pu_k, 'purity@k-std': std_pu_k,
-        #            'nmi@k': avg_nmi_k, 'nmi@k-std': std_nmi_k,
-        #            'ari': avg_ri, 'ari-std': std_ri,
-        #            'best_k': avg_best_k, 'std_k': std_best_k}
-
-        # self.logger.log_metrics(metrics, step=len(outputs))
-
-        return {'test_loss': avg_loss}
-                # 'test_ri': avg_ri,
-                # 'ari@k': avg_ri_k, 'ari@k-std': std_ri_k,
-                # # 'acc@k': avg_acc_k, 'acc@k-std': std_acc_k,
-                # 'purity@k': avg_pu_k, 'purity@k-std': std_pu_k,
-                # 'nmi@k': avg_nmi_k, 'nmi@k-std': std_nmi_k}
+    # def test_epoch_end(self, outputs):
+    #
+    #     avg_loss = torch.stack([x['test_loss'] for x in outputs]).mean()
+    #     # avg_ri_k = torch.stack([x['test_ri@k'] for x in outputs]).mean()
+    #     # std_ri_k = torch.stack([x['test_ri@k'] for x in outputs]).std()
+    #     # # avg_acc_k = torch.stack([x['test_acc@k'] for x in outputs]).mean()
+    #     # # std_acc_k = torch.stack([x['test_acc@k'] for x in outputs]).std()
+    #     # avg_pu_k = torch.stack([x['test_pu@k'] for x in outputs]).mean()
+    #     # std_pu_k = torch.stack([x['test_pu@k'] for x in outputs]).std()
+    #     # avg_nmi_k = torch.stack([x['test_nmi@k'] for x in outputs]).mean()
+    #     # std_nmi_k = torch.stack([x['test_nmi@k'] for x in outputs]).std()
+    #     # avg_ri = torch.stack([x['test_ri'] for x in outputs]).mean()
+    #     # std_ri = torch.stack([x['test_ri'] for x in outputs]).std()
+    #     # avg_best_k = torch.stack([x['k'] for x in outputs]).mean()
+    #     # std_best_k = torch.stack([x['k'] for x in outputs]).std()
+    #
+    #     # predictions = torch.from_numpy(np.stack([x['prediction'] for x in outputs]))
+    #
+    #     # metrics = {'ari@k': avg_ri_k, 'ari@k-std': std_ri_k,
+    #     #            # 'acc@k': avg_acc_k, 'acc@k-std': std_acc_k,
+    #     #            'purity@k': avg_pu_k, 'purity@k-std': std_pu_k,
+    #     #            'nmi@k': avg_nmi_k, 'nmi@k-std': std_nmi_k,
+    #     #            'ari': avg_ri, 'ari-std': std_ri,
+    #     #            'best_k': avg_best_k, 'std_k': std_best_k}
+    #
+    #     # self.logger.log_metrics(metrics, step=len(outputs))
+    #
+    #     return {'test_loss': avg_loss}
+    #             # 'test_ri': avg_ri,
+    #             # 'ari@k': avg_ri_k, 'ari@k-std': std_ri_k,
+    #             # # 'acc@k': avg_acc_k, 'acc@k-std': std_acc_k,
+    #             # 'purity@k': avg_pu_k, 'purity@k-std': std_pu_k,
+    #             # 'nmi@k': avg_nmi_k, 'nmi@k-std': std_nmi_k}
 

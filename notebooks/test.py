@@ -31,7 +31,7 @@ def configure(config):
     parser.add_argument('--plot', default=-1, type=int, help='interval in which we plot prediction on validation batch')
     parser.add_argument('--gpu', default="", type=str, help='use gpu')
     parser.add_argument('--distributed', help='if True run on a cluster machine', action='store_true')
-    parser.add_argument('--num_workers', type=int, default=6)
+    parser.add_argument('--num_workers', type=int, default=10)
     parser.add_argument('--fixed_points', type=int, default=config['fixed_points']['value'])
     parser.add_argument('--embedding', type=int, default=config['embedding']['value'])
 
@@ -73,6 +73,8 @@ def configure(config):
         nn = DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout)
     elif model_name == 'vn_dgcnn_partseg':
         nn = VN_DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
+    elif model_name == 'vn_dgcnn_partseg_class':
+        nn = VN_DGCNN_partseg_encoder(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
     elif model_name == 'vn_dgcnn_partseg_class':
         nn = VN_DGCNN_partseg_encoder(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
 
