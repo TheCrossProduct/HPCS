@@ -78,7 +78,7 @@ class SimilarityHypHC(pl.LightningModule):
         self.save_hyperparameters()
         self.model = nn
         self.sim_distance = sim_distance
-        self.temperature = temperature
+        # self.temperature = temperature
         self.anneal = anneal
         self.anneal_step = anneal_step
         self.margin = margin
@@ -88,14 +88,14 @@ class SimilarityHypHC(pl.LightningModule):
         self.factor = factor
         self.min_lr = min_lr
 
-        # self.temperature = torch.nn.Parameter(torch.Tensor([temperature]), requires_grad=True)
+        self.temperature = torch.nn.Parameter(torch.Tensor([temperature]), requires_grad=True)
         self.scale = torch.nn.Parameter(torch.Tensor([init_rescale]), requires_grad=True)
 
         self.triplet_loss = TripletHyperbolicLoss(sim_distance=sim_distance,
                                                   margin=margin,
                                                   scale=self.scale,
                                                   max_scale=max_scale,
-                                                  temperature=temperature,
+                                                  temperature=self.temperature,
                                                   anneal=anneal)
 
     def _decode_linkage(self, leaves_embeddings):

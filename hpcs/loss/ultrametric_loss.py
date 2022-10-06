@@ -27,12 +27,14 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
         elif sim_distance == 'euclidean':
             self.distance_sim = LpDistance()
 
-        self.hyp_miner = RandomTripletMarginMiner(distance=CosineSimilarity(), margin=0, t_per_anchor=100, type_of_triplets='easy')
-        self.triplet_miner = RandomTripletMarginMiner(distance=CosineSimilarity(), margin=0, t_per_anchor=200, type_of_triplets='hard')
+        self.hyp_miner = RandomTripletMarginMiner(distance=CosineSimilarity(), margin=0, t_per_anchor=1000, type_of_triplets='easy')
+        self.triplet_miner = RandomTripletMarginMiner(distance=CosineSimilarity(), margin=0, t_per_anchor=1000, type_of_triplets='hard')
 
         self.loss_triplet_sim = TripletMarginLoss(distance=CosineSimilarity(), margin=0.05)
 
     def anneal_temperature(self):
+        min_scale = 0.2
+        max_scale = 0.8
         self.temperature *= self.anneal
         return self.temperature
 
@@ -40,10 +42,11 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
         """Normalize leaves embeddings to have the lie on a diameter."""
         min_scale = 1e-2
         max_scale = self.max_scale
-        return F.normalize(embeddings, p=2, dim=1) * self.scale
+        return F.normalize(embeddings, p=2, dim=1) * torch.clamp(self.scale, min_scale, max_scale)
 
     def compute_loss(self, embeddings, labels, indices_tuple, ref_emb, ref_labels, t_per_anchor):
         triplet_indices_tuple = self.triplet_miner(embeddings, labels)
+        # hyp_indices_tuple = lmu.convert_to_triplets(None, labels, t_per_anchor=500)
         hyp_indices_tuple = self.hyp_miner(embeddings, labels)
 
         anchor_idx, positive_idx, negative_idx = hyp_indices_tuple
@@ -66,18 +69,17 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
             wik = mat_sim[anchor_idx, negative_idx]
             wjk = mat_sim[positive_idx, negative_idx]
 
-        # print(self.temperature)
         # loss proposed by Chami et al.
         sim_triplet = torch.stack([wij, wik, wjk]).T    # [torch.exp(-dij), torch.exp(-dik), torch.exp(-djk)]
         lca_triplet = torch.stack([dij, dik, djk]).T
-        weights = torch.softmax(lca_triplet / 0.01, dim=-1)
+        weights = torch.softmax(lca_triplet / torch.clamp(self.temperature, 0.01, 1), dim=-1)
 
         w_ord = torch.sum(sim_triplet * weights, dim=-1, keepdim=True)
         total = torch.sum(sim_triplet, dim=-1, keepdim=True) - w_ord
 
         loss_triplet_lca = torch.mean(total) + mat_sim.mean()
 
-        loss_triplet_sim = self.loss_triplet_sim(embeddings, labels, triplet_indices_tuple)
+        loss_triplet_sim = self.loss_triplet_sim(self.normalize_embeddings(embeddings), labels, triplet_indices_tuple)
 
         return {
             "loss_lca": {

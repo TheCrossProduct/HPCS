@@ -1,12 +1,14 @@
 import os
 import argparse
 import os.path as osp
+import h5py
 import yaml
 
 import torch
 from collections import OrderedDict
 from torch.utils.data import DataLoader
 from data.ShapeNet.ShapeNetDataLoader import PartNormalDataset
+from data.PartNet.h5_torch_dataset import H5Dataset
 
 import wandb
 import pytorch_lightning as pl
@@ -19,6 +21,7 @@ from hpcs.nn.dgcnn import DGCNN_partseg
 from hpcs.nn.dgcnn import VN_DGCNN_partseg
 from hpcs.nn.dgcnn import VN_DGCNN_partseg_class
 from hpcs.nn.dgcnn import VN_DGCNN_partseg_encoder
+from hpcs.nn.pointnet import VN_POINTNET_partseg
 
 
 # def sweep():
@@ -43,7 +46,7 @@ def configure(config):
     parser.add_argument('--margin', default=1.0, type=float, help='margin value to use in triplet loss')
     parser.add_argument('--temperature', default=config.temperature, type=float, help='rescale softmax value used in the hyphc loss')
     parser.add_argument('--annealing', default=0.5, type=float, help='annealing factor')
-    parser.add_argument('--anneal_step', default=10, type=int, help='use annealing each n step')
+    parser.add_argument('--anneal_step', default=0, type=int, help='use annealing each n step')
     parser.add_argument('--batch', default=config.batch, type=int, help='batch size')
     parser.add_argument('--epochs', default=config.epochs, type=int, help='number of epochs')
     parser.add_argument('--lr', default=config.lr, type=float, help='learning rate')
@@ -79,15 +82,29 @@ def configure(config):
     embedding = args.embedding
 
 
-    category = 'Airplane'
-    path = osp.join(osp.dirname(osp.realpath(__file__)), 'data', 'ShapeNet/raw')
+    if config.dataset == 'shapenet':
+        category = 'Airplane'
+        path = osp.join(osp.dirname(osp.realpath(__file__)), 'data', 'ShapeNet/raw')
 
-    train_dataset = PartNormalDataset(root=path, npoints=fixed_points, split='train', class_choice=category)
-    train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers)
-    valid_dataset = PartNormalDataset(root=path, npoints=fixed_points, split='val', class_choice=category)
-    valid_loader = DataLoader(valid_dataset, batch_size=batch, shuffle=False, num_workers=num_workers)
-    test_dataset = PartNormalDataset(root=path, npoints=fixed_points, split='test', class_choice=category)
-    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
+        train_dataset = PartNormalDataset(root=path, npoints=fixed_points, split='train', class_choice=category)
+        train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers)
+        valid_dataset = PartNormalDataset(root=path, npoints=fixed_points, split='val', class_choice=category)
+        valid_loader = DataLoader(valid_dataset, batch_size=batch, shuffle=False, num_workers=num_workers)
+        test_dataset = PartNormalDataset(root=path, npoints=fixed_points, split='test', class_choice=category)
+        test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
+
+    elif config.dataset == 'partnet':
+        category = 'Bag'
+        train_path = osp.join(osp.dirname(osp.realpath(__file__)), 'data/PartNet/ins_seg_h5/%s/train-00.h5' % category)
+        valid_path = osp.join(osp.dirname(osp.realpath(__file__)), 'data/PartNet/ins_seg_h5/%s/val-00.h5' % category)
+        test_path = osp.join(osp.dirname(osp.realpath(__file__)), 'data/PartNet/ins_seg_h5/%s/test-00.h5' % category)
+
+        train_dataset = h5py.File(train_path, 'r')
+        valid_dataset = h5py.File(valid_path, 'r')
+        test_dataset = h5py.File(test_path, 'r')
+        train_loader = DataLoader(H5Dataset([train_path]), batch_size=batch, shuffle=True, num_workers=num_workers)
+        valid_loader = DataLoader(H5Dataset([valid_path]), batch_size=batch, shuffle=False, num_workers=num_workers)
+        test_loader = DataLoader(H5Dataset([test_path]), batch_size=1, shuffle=False, num_workers=num_workers)
 
 
     if len(args.gpu):
@@ -109,6 +126,8 @@ def configure(config):
         nn = VN_DGCNN_partseg_class(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
     elif model_name == 'vn_dgcnn_partseg_encoder':
         nn = VN_DGCNN_partseg_encoder(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
+    elif model_name == 'vn_pointnet_partseg':
+        nn = VN_POINTNET_partseg(normal_channel=True, num_part=out_features, k=k, pooling='mean')
 
     if config.pretrained:
         model_path = osp.realpath('model.partseg.vn_dgcnn.aligned.t7')
@@ -161,7 +180,7 @@ def configure(config):
                          max_epochs=epochs,
                          callbacks=[early_stop_callback, checkpoint_callback],
                          logger=logger,
-                         limit_train_batches=50,
+                         # limit_train_batches=50,
                          limit_test_batches=25
                          )
 
@@ -174,7 +193,7 @@ def train(model, trainer, train_loader, valid_loader, test_loader):
         os.remove('model.ckpt')
 
     if config.resume:
-        wandb.restore('model.ckpt', root=os.getcwd(), run_path='pierreoo/HPCS/runs/36yyycb5')
+        wandb.restore('model.ckpt', root=os.getcwd(), run_path='pierreoo/HPCS/runs/1ra3pqdr')
         model = model.load_from_checkpoint('model.ckpt')
 
     trainer.fit(model, train_loader, valid_loader)
@@ -200,17 +219,17 @@ if __name__ == "__main__":
     # wandb.agent(sweep_id, function=sweep, count=1, project="HPCS")
 
     config = dict(
-        batch=24,
+        batch=32,
         epochs=50,
         lr=0.0001,
         temperature=0.8,
         dropout=0.0,
-        fixed_points=1024,
-        embedding=4,
+        fixed_points=256,
+        embedding=16,
         model="vn_dgcnn_partseg",
         dataset="shapenet",
         gpu="0",
-        resume=True,
+        resume=False,
         pretrained=False,
     )
 
