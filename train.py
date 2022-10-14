@@ -37,7 +37,7 @@ def configure(config):
     parser.add_argument('--logdir', default='logs', type=str, help='dirname for logs')
     parser.add_argument('--data', default=config.dataset, type=str, help='name of dataset to use')
     parser.add_argument('--model', default=config.model, type=str, help='model to use to extract features')
-    parser.add_argument('--k', default=10, type=int, help='if model dgcnn, k is the number of neigh to take into account')
+    parser.add_argument('--k', default=5, type=int, help='if model dgcnn, k is the number of neigh to take into account')
     parser.add_argument('--hidden', default=64, type=int, help='number of hidden features')
     parser.add_argument('--negative_slope', default=0.2, type=float, help='negative slope for leaky relu in the feature extractor')
     parser.add_argument('--dropout', default=config.dropout, type=float, help='dropout in the feature extractor')
@@ -83,7 +83,7 @@ def configure(config):
 
 
     if config.dataset == 'shapenet':
-        category = 'Airplane'
+        category = None
         path = osp.join(osp.dirname(osp.realpath(__file__)), 'data', 'ShapeNet/raw')
 
         train_dataset = PartNormalDataset(root=path, npoints=fixed_points, split='train', class_choice=category)
@@ -91,7 +91,7 @@ def configure(config):
         valid_dataset = PartNormalDataset(root=path, npoints=fixed_points, split='val', class_choice=category)
         valid_loader = DataLoader(valid_dataset, batch_size=batch, shuffle=False, num_workers=num_workers)
         test_dataset = PartNormalDataset(root=path, npoints=fixed_points, split='test', class_choice=category)
-        test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
+        test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True, num_workers=num_workers)
 
     elif config.dataset == 'partnet':
         category = 'Bag'
@@ -100,7 +100,9 @@ def configure(config):
         test_path = osp.join(osp.dirname(osp.realpath(__file__)), 'data/PartNet/ins_seg_h5/%s/test-00.h5' % category)
 
         train_dataset = h5py.File(train_path, 'r')
+        print(torch.Tensor(train_dataset['pts']).size())
         valid_dataset = h5py.File(valid_path, 'r')
+        print(torch.Tensor(valid_dataset['pts']).size())
         test_dataset = h5py.File(test_path, 'r')
         train_loader = DataLoader(H5Dataset([train_path]), batch_size=batch, shuffle=True, num_workers=num_workers)
         valid_loader = DataLoader(H5Dataset([valid_path]), batch_size=batch, shuffle=False, num_workers=num_workers)
@@ -180,8 +182,10 @@ def configure(config):
                          max_epochs=epochs,
                          callbacks=[early_stop_callback, checkpoint_callback],
                          logger=logger,
-                         # limit_train_batches=50,
-                         limit_test_batches=25
+                         gradient_clip_val=1.0,
+                         # limit_train_batches=5,
+                         # limit_val_batches=5,
+                         limit_test_batches=40
                          )
 
     return model, trainer, train_loader, valid_loader, test_loader
@@ -193,7 +197,7 @@ def train(model, trainer, train_loader, valid_loader, test_loader):
         os.remove('model.ckpt')
 
     if config.resume:
-        wandb.restore('model.ckpt', root=os.getcwd(), run_path='pierreoo/HPCS/runs/1ra3pqdr')
+        wandb.restore('model.ckpt', root=os.getcwd(), run_path='pierreoo/HPCS/runs/2v2xt8is')
         model = model.load_from_checkpoint('model.ckpt')
 
     trainer.fit(model, train_loader, valid_loader)
@@ -219,13 +223,13 @@ if __name__ == "__main__":
     # wandb.agent(sweep_id, function=sweep, count=1, project="HPCS")
 
     config = dict(
-        batch=32,
+        batch=16,
         epochs=50,
-        lr=0.0001,
-        temperature=0.8,
+        lr=0.001,
+        temperature=0.2,
         dropout=0.0,
         fixed_points=256,
-        embedding=16,
+        embedding=3,
         model="vn_dgcnn_partseg",
         dataset="shapenet",
         gpu="0",

@@ -16,11 +16,6 @@ class RandomTripletMarginMiner(miners.TripletMarginMiner):
         mat = self.distance(embeddings, ref_emb)
         ap_dist = mat[anchor_idx, positive_idx]
         an_dist = mat[anchor_idx, negative_idx]
-        # e1 = embeddings[anchor_idx]
-        # e2 = embeddings[positive_idx]
-        # e3 = embeddings[negative_idx]
-        # ap_dist = hyp_lca(e1, e2, return_coord=False)
-        # an_dist = hyp_lca(e1, e3, return_coord=False)
 
         triplet_margin = (
             ap_dist - an_dist if self.distance.is_inverted else an_dist - ap_dist
