@@ -7,7 +7,7 @@ from hpcs.nn.pointnet.pointnet import STN3d, STNkd, feature_transform_reguliarze
 
 
 class POINTNET_partseg(nn.Module):
-    def __init__(self, args, num_part=50, normal_channel=False):
+    def __init__(self, num_part=50, normal_channel=False):
         super(POINTNET_partseg, self).__init__()
         if normal_channel:
             channel = 6
@@ -71,7 +71,7 @@ class POINTNET_partseg(nn.Module):
         net = F.log_softmax(net.view(-1, self.num_part), dim=-1)
         net = net.view(B, N, self.num_part) # [B, N, 50]
 
-        return net, trans_feat
+        return net
 
 
 class get_loss(torch.nn.Module):

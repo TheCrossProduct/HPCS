@@ -6,7 +6,10 @@ from hpcs.nn._hyp_hc import SimilarityHypHC
 from hpcs.nn.dgcnn import DGCNN_simple
 from hpcs.nn.dgcnn import DGCNN_partseg
 from hpcs.nn.dgcnn import VN_DGCNN_partseg
+from hpcs.nn.dgcnn import VN_DGCNN_partseg_class
 from hpcs.nn.dgcnn import VN_DGCNN_partseg_encoder
+from hpcs.nn.pointnet import POINTNET_partseg
+from hpcs.nn.pointnet import VN_POINTNET_partseg
 
 
 def configure(config):
@@ -74,22 +77,27 @@ def configure(config):
     elif model_name == 'vn_dgcnn_partseg':
         nn = VN_DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
     elif model_name == 'vn_dgcnn_partseg_class':
+        nn = VN_DGCNN_partseg_class(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
+    elif model_name == 'vn_dgcnn_partseg_encoder':
         nn = VN_DGCNN_partseg_encoder(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
-    elif model_name == 'vn_dgcnn_partseg_class':
-        nn = VN_DGCNN_partseg_encoder(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
+    elif model_name == 'pointnet_partseg':
+        nn = POINTNET_partseg(num_part=out_features, normal_channel=False)
+    elif model_name == 'vn_pointnet_partseg':
+        nn = VN_POINTNET_partseg(normal_channel=True, num_part=out_features, k=k, pooling='mean')
 
 
     model = SimilarityHypHC(nn=nn,
                             sim_distance=distance,
-                            margin=margin,
                             temperature=temperature,
                             anneal=annealing,
-                            anneal_step=anneal_step)
-
+                            anneal_step=anneal_step,
+                            embedding=embedding,
+                            margin=margin,
+                            lr=lr)
 
     trainer = pl.Trainer(gpus=gpu,
                          max_epochs=epochs,
-                         limit_test_batches=40,
+                         limit_test_batches=5,
                          )
 
     return model, trainer

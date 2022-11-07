@@ -2,7 +2,7 @@ from pytorch_metric_learning import miners
 from pytorch_metric_learning.utils import loss_and_miner_utils as lmu
 
 import torch
-from hpcs.distances.lca import hyp_lca
+from hpcs.miners.loss_and_miner_utils import get_balanced_random_triplet_indices
 
 
 class RandomTripletMarginMiner(miners.TripletMarginMiner):
@@ -12,7 +12,7 @@ class RandomTripletMarginMiner(miners.TripletMarginMiner):
 
 
     def mine(self, embeddings, labels, ref_emb, ref_labels):
-        anchor_idx, positive_idx, negative_idx = lmu.convert_to_triplets(None, labels, t_per_anchor=self.t_per_anchor)
+        anchor_idx, positive_idx, negative_idx = get_balanced_random_triplet_indices(labels=labels, ref_labels=None, t_per_anchor=self.t_per_anchor)
         mat = self.distance(embeddings, ref_emb)
         ap_dist = mat[anchor_idx, positive_idx]
         an_dist = mat[anchor_idx, negative_idx]

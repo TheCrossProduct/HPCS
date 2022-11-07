@@ -88,7 +88,7 @@ class VN_POINTNET_partseg(nn.Module):
         net = net.view(B, N, self.num_part)  # [B, N, 50]
 
         trans_feat = None
-        return net, trans_feat
+        return net
 
 
 class get_loss(torch.nn.Module):

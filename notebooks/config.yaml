@@ -8,7 +8,7 @@ _wandb:
     is_jupyter_run: false
     is_kaggle_kernel: false
     python_version: 3.10.4
-    start_time: 1665743465.635274
+    start_time: 1667826344.355918
     t:
       1:
       - 1
@@ -36,22 +36,25 @@ _wandb:
       - 5
 anneal:
   desc: null
-  value: 0.5
+  value: 2
 anneal_step:
   desc: null
   value: 0
 batch:
   desc: null
-  value: 16
+  value: 6
+category:
+  desc: null
+  value: Chair
 dataset:
   desc: null
-  value: shapenet
+  value: partnet
 dropout:
   desc: null
   value: 0.0
 embedding:
   desc: null
-  value: 3
+  value: 6
 epochs:
   desc: null
   value: 50
@@ -67,12 +70,15 @@ gpu:
 init_rescale:
   desc: null
   value: 0.01
+level:
+  desc: null
+  value: 3
 lr:
   desc: null
-  value: 0.001
+  value: 0.05
 margin:
   desc: null
-  value: 1.0
+  value: 0.05
 max_scale:
   desc: null
   value: 0.999
@@ -93,10 +99,10 @@ pretrained:
   value: false
 resume:
   desc: null
-  value: true
+  value: false
 sim_distance:
   desc: null
   value: cosine
 temperature:
   desc: null
-  value: 0.2
+  value: 1

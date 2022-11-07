@@ -72,7 +72,7 @@ class SimilarityHypHC(pl.LightningModule):
 
     def __init__(self, nn: torch.nn.Module,
                  sim_distance: str = 'cosine', temperature: float = 0.05, anneal: float = 0.5, anneal_step: int = 0,
-                 margin: float = 1.0, init_rescale: float = 1e-2, max_scale: float = 1. - 1e-3, lr: float = 1e-3,
+                 embedding: int = 6, margin: float = 1.0, init_rescale: float = 1e-2, max_scale: float = 1. - 1e-3, lr: float = 1e-3,
                  patience: int = 10, factor: float = 0.5, min_lr: float = 1e-4):
         super(SimilarityHypHC, self).__init__()
         self.save_hyperparameters()
@@ -87,12 +87,13 @@ class SimilarityHypHC(pl.LightningModule):
         self.patience = patience
         self.factor = factor
         self.min_lr = min_lr
+        self.embedding = embedding
 
         # self.temperature = torch.nn.Parameter(torch.Tensor([temperature]), requires_grad=True)
         self.scale = torch.nn.Parameter(torch.Tensor([init_rescale]), requires_grad=True)
 
         self.triplet_loss = TripletHyperbolicLoss(sim_distance=sim_distance,
-                                                  margin=margin,
+                                                  margin=self.margin,
                                                   scale=self.scale,
                                                   max_scale=max_scale,
                                                   temperature=self.temperature,
@@ -100,34 +101,51 @@ class SimilarityHypHC(pl.LightningModule):
 
     def _decode_linkage(self, leaves_embeddings):
         """Build linkage matrix from leaves' embeddings. Assume points are normalized to same radius."""
+        # leaves_embeddings = self.triplet_loss.normalize_embeddings(leaves_embeddings)
+        # leaves_embeddings = project(leaves_embeddings).detach().cpu()
+        # Z = linkage(leaves_embeddings, method='ward', metric='euclidean')
+
         leaves_embeddings = self.triplet_loss.normalize_embeddings(leaves_embeddings)
-        leaves_embeddings = project(leaves_embeddings).detach().cpu()
-        Z = linkage(leaves_embeddings, method='ward', metric='euclidean')
+        sim_fn = lambda x, y: np.arccos(np.clip(np.sum(x * y, axis=-1), -1.0, 1.0))
+        embeddings = F.normalize(leaves_embeddings, p=2, dim=1).detach().cpu()
+        Z = linkage(embeddings, method='average', metric=sim_fn)
 
         return Z
 
 
-    def forward(self, data, decode=False, augmentation=False):
+    def forward(self, batch):
+        dataset = 'partnet'
+        if dataset == 'shapenet':
+            points, label, targets = batch
+        elif dataset == 'partnet':
+            points, targets = batch
+            label = torch.zeros(points.size(0), 1)
+
+        trot = None
+        rot = 'so3'
+        if rot == 'z':
+            trot = RotateAxisAngle(angle=torch.rand(points.shape[0]) * 360, axis="Z", degrees=True)
+        elif rot == 'so3':
+            trot = Rotate(R=random_rotations(points.shape[0]))
+        if trot is not None:
+            points = trot.transform_points(points.cpu())
+
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        points, label, targets = data
         points, label, targets = points.float().to(device), label.long().to(device), targets.long().to(device)
-        points = points.permute(0, 2, 1)
+        points = points.transpose(2, 1)
 
         num_classes = 16
         x_emb = self.model(points, to_categorical(label, num_classes))
-        x_emb_reshape = torch.reshape(x_emb, (x_emb.size(0) * x_emb.size(1), x_emb.size(2)))
         x_poincare = project(self.scale * x_emb)
-        x_poincare_reshape = torch.reshape(x_poincare, (x_poincare.size(0) * x_poincare.size(1), x_poincare.size(2)))
+
+        x_poincare_reshape = x_poincare.contiguous().view(-1, self.embedding)
+        targets_reshape = targets.view(-1, 1)[:, 0]
 
         # x_poincare = project(self.scale * points)
         # x_emb = self.model(x_poincare, to_categorical(label, num_classes))
-        # x_emb = torch.reshape(x_emb, (x_emb.size(0) * x_emb.size(1), x_emb.size(2)))
 
-        x_feat_samples = x_poincare_reshape
-        y_samples = targets.view(-1, 1).squeeze()
-
-        losses = self.triplet_loss.compute_loss(embeddings=x_poincare,
-                                                labels=targets,
+        losses = self.triplet_loss.compute_loss(embeddings=x_poincare_reshape,
+                                                labels=targets_reshape,
                                                 indices_tuple=None,
                                                 ref_emb=None,
                                                 ref_labels=None,
@@ -139,10 +157,13 @@ class SimilarityHypHC(pl.LightningModule):
         return loss_triplet, loss_hyphc
 
 
-    def _forward(self, data, decode=False, augmentation=False):
-        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        points, label, targets = data
-        points, label, targets = points.float().to(device), label.long().to(device), targets.long().to(device)
+    def _forward(self, batch):
+        dataset = 'partnet'
+        if dataset == 'shapenet':
+            points, label, targets = batch
+        elif dataset == 'partnet':
+            points, targets = batch
+            label = torch.zeros(points.size(0), 1)
 
         trot = None
         rot = 'so3'
@@ -152,30 +173,23 @@ class SimilarityHypHC(pl.LightningModule):
             trot = Rotate(R=random_rotations(points.shape[0]))
         if trot is not None:
             points = trot.transform_points(points.cpu())
-        points = points.data.numpy()
-        if augmentation:
-            points[:, :, 0:3] = provider.random_scale_point_cloud(points[:, :, 0:3])
-            points[:, :, 0:3] = provider.shift_point_cloud(points[:, :, 0:3])
-        points = torch.Tensor(points)
+
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         points, label, targets = points.float().to(device), label.long().to(device), targets.long().to(device)
-        points = points.permute(0, 2, 1)
+        points = points.transpose(2, 1)
 
         num_classes = 16
         x_emb = self.model(points, to_categorical(label, num_classes))
-        x_emb_reshape = torch.reshape(x_emb, (x_emb.size(0) * x_emb.size(1), x_emb.size(2)))
         x_poincare = project(self.scale * x_emb)
-        x_poincare_reshape = torch.reshape(x_poincare, (x_poincare.size(0) * x_poincare.size(1), x_poincare.size(2)))
+
+        x_poincare_reshape = x_poincare.contiguous().view(-1, self.embedding)
+        targets_reshape = targets.view(-1, 1)[:, 0]
 
         # x_poincare = project(self.scale * points)
         # x_emb = self.model(x_poincare, to_categorical(label, num_classes))
-        # x_emb = torch.reshape(x_emb, (x_emb.size(0) * x_emb.size(1), x_emb.size(2)))
 
-        x_feat_samples = x_poincare_reshape
-        y_samples = targets.view(-1, 1).squeeze()
-
-        losses = self.triplet_loss.compute_loss(embeddings=x_poincare,
-                                                labels=targets,
+        losses = self.triplet_loss.compute_loss(embeddings=x_poincare_reshape,
+                                                labels=targets_reshape,
                                                 indices_tuple=None,
                                                 ref_emb=None,
                                                 ref_labels=None,
@@ -184,21 +198,20 @@ class SimilarityHypHC(pl.LightningModule):
         loss_triplet = losses['loss_sim']['losses']
         loss_hyphc = losses['loss_lca']['losses']
 
-        linkage_mat = []
-        if decode:
-            for i in range(points.size(0)):
-                Z = self._decode_linkage(x_poincare[i])
-                linkage_mat.append(Z)
+        linkage_matrix = []
+        for object_idx in range(points.size(0)):
+            Z = self._decode_linkage(x_poincare[object_idx])
+            linkage_matrix.append(Z)
 
-        return x_emb_reshape, x_poincare_reshape, loss_triplet, loss_hyphc, linkage_mat, points, y_samples
+        return x_emb, x_poincare, loss_triplet, loss_hyphc, linkage_matrix, points, targets
 
 
     def configure_optimizers(self):
         optim = RAdam(self.parameters(), lr=self.lr)
         scheduler = [
             {
-                'scheduler': lr_scheduler.ReduceLROnPlateau(optim, mode='min', factor=0.5, patience=10,
-                                                            min_lr=1e-4, verbose=True),
+                'scheduler': lr_scheduler.ReduceLROnPlateau(optim, mode='min', factor=0.5, patience=5,
+                                                            min_lr=1e-6, verbose=True),
                 'monitor': 'val_loss',
                 'interval': 'epoch',
                 'frequency': 1,
@@ -208,8 +221,8 @@ class SimilarityHypHC(pl.LightningModule):
 
         return [optim], scheduler
 
-    def training_step(self, data, batch_idx):
-        loss_triplet, loss_hyphc = self.forward(data)
+    def training_step(self, batch, batch_idx):
+        loss_triplet, loss_hyphc = self.forward(batch)
         loss = loss_triplet + loss_hyphc
 
         self.log("train_loss", {"total_loss": loss, "triplet_loss": loss_triplet, "hyphc_loss": loss_hyphc})
@@ -218,37 +231,39 @@ class SimilarityHypHC(pl.LightningModule):
         return {'loss': loss, 'progress_bar': {'triplet': loss_triplet, 'hyphc': loss_hyphc}}
 
     def training_epoch_end(self, outputs):
-        avg_loss = torch.stack([x['loss'] for x in outputs]).mean()
         if self.current_epoch and self.anneal_step > 0 and self.current_epoch % self.anneal_step == 0:
             print(f"Annealing temperature at the end of epoch {self.current_epoch}")
             self.temperature = self.triplet_loss.anneal_temperature()
             print("Temperature Value: ", self.temperature)
 
-    def validation_step(self, data, batch_idx):
-        val_loss_triplet, val_loss_hyphc = self.forward(data)
+    def validation_step(self, batch, batch_idx):
+        val_loss_triplet, val_loss_hyphc = self.forward(batch)
         val_loss = val_loss_triplet + val_loss_hyphc
 
         self.log("val_loss", val_loss)
         return {'val_loss': val_loss}
 
-    def validation_epoch_end(self, outputs):
-        avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-
-    def test_step(self, data, batch_idx, triplet_heat_map=False):
-        x, x_poincare, test_loss_triplet, test_loss_hyphc, linkage_matrix, points, targets = self._forward(data, decode=True)
+    def test_step(self, batch, batch_idx, triplet_heat_map=False):
+        x_emb, x_poincare, test_loss_triplet, test_loss_hyphc, linkage_matrix, points, targets = self._forward(batch)
         test_loss = test_loss_hyphc + test_loss_triplet
 
-        y_pred_k, k, best_ri = get_optimal_k(targets.detach().cpu().numpy(), linkage_matrix[0])
-        pu_score, nmi_score, ri_score = eval_clustering(y_true=targets.detach().cpu(), Z=linkage_matrix[0])
+        rand_indexes = []
+        for object_idx in range(points.size(0)):
+            y_pred_k, k, best_ri = get_optimal_k(targets[object_idx].cpu(), linkage_matrix[object_idx])
+            # pu_score, nmi_score, ri_score = eval_clustering(y_true=targets.detach().cpu(), Z=linkage_matrix[0])
 
-        plot_hyperbolic_eval(x=points.detach().cpu(),
-                             y=targets.detach().cpu(),
-                             y_pred=y_pred_k,
-                             emb_hidden=x.detach().cpu(),
-                             emb_poincare=self.triplet_loss.normalize_embeddings(x_poincare).detach().cpu(),
-                             linkage_matrix=linkage_matrix[0],
-                             k=k,
-                             show=True)
+            plot_hyperbolic_eval(x=points[object_idx].T.cpu(),
+                                 y=targets[object_idx].cpu(),
+                                 y_pred=y_pred_k,
+                                 emb_hidden=x_emb[object_idx].cpu(),
+                                 emb_poincare=self.triplet_loss.normalize_embeddings(x_poincare[object_idx]).cpu(),
+                                 linkage_matrix=linkage_matrix[object_idx],
+                                 k=k,
+                                 show=True)
+
+            rand_indexes.append(best_ri)
+        score = torch.mean(torch.tensor(rand_indexes))
+
 
         if triplet_heat_map:
             easy_miner = RandomTripletMarginMiner(distance=CosineSimilarity(), margin=0, t_per_anchor=10000, type_of_triplets='easy')
@@ -284,46 +299,6 @@ class SimilarityHypHC(pl.LightningModule):
                 points_transpose = torch.transpose(points_reshaped, 0, 1)
                 plot_cloud(xyz=points_transpose.numpy(), scalars=scalar, point_size=5.0)
 
+        self.log("score", score)
         self.log("test_loss", test_loss)
         return {'test_loss': test_loss}
-                # 'test_ri@k': torch.tensor(ri_score),
-                # 'test_pu@k': torch.tensor(pu_score), 'test_nmi@k': torch.tensor(nmi_score),
-                # 'test_ri': torch.tensor(best_ri), 'k': torch.tensor(k, dtype=torch.float)}
-
-    def test_epoch_end(self, outputs):
-        avg_loss = torch.stack([x['test_loss'] for x in outputs]).mean()
-
-    # def test_epoch_end(self, outputs):
-    #
-    #     avg_loss = torch.stack([x['test_loss'] for x in outputs]).mean()
-    #     # avg_ri_k = torch.stack([x['test_ri@k'] for x in outputs]).mean()
-    #     # std_ri_k = torch.stack([x['test_ri@k'] for x in outputs]).std()
-    #     # # avg_acc_k = torch.stack([x['test_acc@k'] for x in outputs]).mean()
-    #     # # std_acc_k = torch.stack([x['test_acc@k'] for x in outputs]).std()
-    #     # avg_pu_k = torch.stack([x['test_pu@k'] for x in outputs]).mean()
-    #     # std_pu_k = torch.stack([x['test_pu@k'] for x in outputs]).std()
-    #     # avg_nmi_k = torch.stack([x['test_nmi@k'] for x in outputs]).mean()
-    #     # std_nmi_k = torch.stack([x['test_nmi@k'] for x in outputs]).std()
-    #     # avg_ri = torch.stack([x['test_ri'] for x in outputs]).mean()
-    #     # std_ri = torch.stack([x['test_ri'] for x in outputs]).std()
-    #     # avg_best_k = torch.stack([x['k'] for x in outputs]).mean()
-    #     # std_best_k = torch.stack([x['k'] for x in outputs]).std()
-    #
-    #     # predictions = torch.from_numpy(np.stack([x['prediction'] for x in outputs]))
-    #
-    #     # metrics = {'ari@k': avg_ri_k, 'ari@k-std': std_ri_k,
-    #     #            # 'acc@k': avg_acc_k, 'acc@k-std': std_acc_k,
-    #     #            'purity@k': avg_pu_k, 'purity@k-std': std_pu_k,
-    #     #            'nmi@k': avg_nmi_k, 'nmi@k-std': std_nmi_k,
-    #     #            'ari': avg_ri, 'ari-std': std_ri,
-    #     #            'best_k': avg_best_k, 'std_k': std_best_k}
-    #
-    #     # self.logger.log_metrics(metrics, step=len(outputs))
-    #
-    #     return {'test_loss': avg_loss}
-    #             # 'test_ri': avg_ri,
-    #             # 'ari@k': avg_ri_k, 'ari@k-std': std_ri_k,
-    #             # # 'acc@k': avg_acc_k, 'acc@k-std': std_acc_k,
-    #             # 'purity@k': avg_pu_k, 'purity@k-std': std_pu_k,
-    #             # 'nmi@k': avg_nmi_k, 'nmi@k-std': std_nmi_k}
-

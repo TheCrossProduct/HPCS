@@ -1,14 +1,28 @@
 program: train.py
-method: bayes
+method: random
 metric:
   goal: minimize
   name: val_loss
 parameters:
   batch:
-    values: [5]
-  epochs:
-    values: [5]
+    values: [2, 4, 8, 16, 32]
   lr:
-    values: [1e-3]
+    values: [1e-3, 1e-4, 1e-5]
+  embedding:
+    values: [2, 3, 6, 10]
+  epochs:
+    values: [15]
+  temperature:
+    values: [1]
+  dropout:
+    values: [0.0]
   fixed_points:
-    values: [150]
+    values: [256]
+  model:
+    values: ["vn_dgcnn_partseg"]
+  dataset:
+    values: ["shapenet"]
+  gpu:
+    values: ["0"]
+  pretrained:
+    values: [False]

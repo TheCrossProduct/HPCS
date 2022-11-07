@@ -9,6 +9,7 @@ from collections import OrderedDict
 from torch.utils.data import DataLoader
 from data.ShapeNet.ShapeNetDataLoader import PartNormalDataset
 from data.PartNet.h5_torch_dataset import H5Dataset
+from hpcs.partnet import data_utils
 
 import wandb
 import pytorch_lightning as pl
@@ -21,14 +22,8 @@ from hpcs.nn.dgcnn import DGCNN_partseg
 from hpcs.nn.dgcnn import VN_DGCNN_partseg
 from hpcs.nn.dgcnn import VN_DGCNN_partseg_class
 from hpcs.nn.dgcnn import VN_DGCNN_partseg_encoder
+from hpcs.nn.pointnet import POINTNET_partseg
 from hpcs.nn.pointnet import VN_POINTNET_partseg
-
-
-# def sweep():
-#     with wandb.init():
-#         config = wandb.config
-#         model, trainer, train_loader, valid_loader, test_loader, savedir = configure(config)
-#         train(model, trainer, train_loader, valid_loader, test_loader)
 
 
 def configure(config):
@@ -37,15 +32,15 @@ def configure(config):
     parser.add_argument('--logdir', default='logs', type=str, help='dirname for logs')
     parser.add_argument('--data', default=config.dataset, type=str, help='name of dataset to use')
     parser.add_argument('--model', default=config.model, type=str, help='model to use to extract features')
-    parser.add_argument('--k', default=5, type=int, help='if model dgcnn, k is the number of neigh to take into account')
+    parser.add_argument('--k', default=10, type=int, help='if model dgcnn, k is the number of neigh to take into account')
     parser.add_argument('--hidden', default=64, type=int, help='number of hidden features')
     parser.add_argument('--negative_slope', default=0.2, type=float, help='negative slope for leaky relu in the feature extractor')
     parser.add_argument('--dropout', default=config.dropout, type=float, help='dropout in the feature extractor')
     parser.add_argument('--cosine', help='if True add use cosine dist in DynamicEdgeConv', action='store_true')
     parser.add_argument('--distance', default='cosine', type=str, help='distance to use to compute triplets')
-    parser.add_argument('--margin', default=1.0, type=float, help='margin value to use in triplet loss')
+    parser.add_argument('--margin', default=config.margin, type=float, help='margin value to use in triplet loss')
     parser.add_argument('--temperature', default=config.temperature, type=float, help='rescale softmax value used in the hyphc loss')
-    parser.add_argument('--annealing', default=0.5, type=float, help='annealing factor')
+    parser.add_argument('--annealing', default=2, type=float, help='annealing factor')
     parser.add_argument('--anneal_step', default=0, type=int, help='use annealing each n step')
     parser.add_argument('--batch', default=config.batch, type=int, help='batch size')
     parser.add_argument('--epochs', default=config.epochs, type=int, help='number of epochs')
@@ -56,6 +51,8 @@ def configure(config):
     parser.add_argument('--num_workers', type=int, default=10)
     parser.add_argument('--fixed_points', type=int, default=config.fixed_points)
     parser.add_argument('--embedding', type=int, default=config.embedding)
+    parser.add_argument('--level', type=int, default=config.level)
+    parser.add_argument('--category', type=str, default=config.category)
 
     args = parser.parse_args()
 
@@ -80,10 +77,11 @@ def configure(config):
     num_workers = args.num_workers
     fixed_points = args.fixed_points
     embedding = args.embedding
+    level = args.level
+    category = args.category
 
 
     if config.dataset == 'shapenet':
-        category = None
         path = osp.join(osp.dirname(osp.realpath(__file__)), 'data', 'ShapeNet/raw')
 
         train_dataset = PartNormalDataset(root=path, npoints=fixed_points, split='train', class_choice=category)
@@ -91,22 +89,16 @@ def configure(config):
         valid_dataset = PartNormalDataset(root=path, npoints=fixed_points, split='val', class_choice=category)
         valid_loader = DataLoader(valid_dataset, batch_size=batch, shuffle=False, num_workers=num_workers)
         test_dataset = PartNormalDataset(root=path, npoints=fixed_points, split='test', class_choice=category)
-        test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True, num_workers=num_workers)
+        test_loader = DataLoader(test_dataset, batch_size=batch, shuffle=True, num_workers=num_workers)
 
     elif config.dataset == 'partnet':
-        category = 'Bag'
-        train_path = osp.join(osp.dirname(osp.realpath(__file__)), 'data/PartNet/ins_seg_h5/%s/train-00.h5' % category)
-        valid_path = osp.join(osp.dirname(osp.realpath(__file__)), 'data/PartNet/ins_seg_h5/%s/val-00.h5' % category)
-        test_path = osp.join(osp.dirname(osp.realpath(__file__)), 'data/PartNet/ins_seg_h5/%s/test-00.h5' % category)
+        train_path = osp.join(osp.dirname(osp.realpath(__file__)), 'data/PartNet/sem_seg_h5/%s-%d/train-00.h5' % (category, level))
+        valid_path = osp.join(osp.dirname(osp.realpath(__file__)), 'data/PartNet/sem_seg_h5/%s-%d/val-00.h5' % (category, level))
+        test_path = osp.join(osp.dirname(osp.realpath(__file__)), 'data/PartNet/sem_seg_h5/%s-%d/test-00.h5' % (category, level))
 
-        train_dataset = h5py.File(train_path, 'r')
-        print(torch.Tensor(train_dataset['pts']).size())
-        valid_dataset = h5py.File(valid_path, 'r')
-        print(torch.Tensor(valid_dataset['pts']).size())
-        test_dataset = h5py.File(test_path, 'r')
-        train_loader = DataLoader(H5Dataset([train_path]), batch_size=batch, shuffle=True, num_workers=num_workers)
-        valid_loader = DataLoader(H5Dataset([valid_path]), batch_size=batch, shuffle=False, num_workers=num_workers)
-        test_loader = DataLoader(H5Dataset([test_path]), batch_size=1, shuffle=False, num_workers=num_workers)
+        train_loader = DataLoader(H5Dataset(train_path, fixed_points), batch_size=batch, shuffle=True, num_workers=num_workers)
+        valid_loader = DataLoader(H5Dataset(valid_path, fixed_points), batch_size=batch, shuffle=False, num_workers=num_workers)
+        test_loader = DataLoader(H5Dataset(test_path, fixed_points), batch_size=batch, shuffle=False, num_workers=num_workers)
 
 
     if len(args.gpu):
@@ -128,6 +120,8 @@ def configure(config):
         nn = VN_DGCNN_partseg_class(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
     elif model_name == 'vn_dgcnn_partseg_encoder':
         nn = VN_DGCNN_partseg_encoder(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
+    elif model_name == 'pointnet_partseg':
+        nn = POINTNET_partseg(num_part=out_features, normal_channel=False)
     elif model_name == 'vn_pointnet_partseg':
         nn = VN_POINTNET_partseg(normal_channel=True, num_part=out_features, k=k, pooling='mean')
 
@@ -143,10 +137,12 @@ def configure(config):
 
     model = SimilarityHypHC(nn=nn,
                             sim_distance=distance,
-                            margin=margin,
                             temperature=temperature,
                             anneal=annealing,
-                            anneal_step=anneal_step)
+                            anneal_step=anneal_step,
+                            embedding=embedding,
+                            margin=margin,
+                            lr=lr)
 
 
     logger = WandbLogger(name=dataname, save_dir=os.path.join(logdir), project="HPCS", log_model=True)
@@ -165,7 +161,8 @@ def configure(config):
                     'epochs': epochs,
                     'batch': batch,
                     'lr': lr,
-                    'fixed_points': fixed_points}
+                    'fixed_points': fixed_points,
+                    'embedding_size': embedding}
     print(model_params)
 
 
@@ -182,10 +179,9 @@ def configure(config):
                          max_epochs=epochs,
                          callbacks=[early_stop_callback, checkpoint_callback],
                          logger=logger,
-                         gradient_clip_val=1.0,
                          # limit_train_batches=5,
                          # limit_val_batches=5,
-                         limit_test_batches=40
+                         limit_test_batches=5
                          )
 
     return model, trainer, train_loader, valid_loader, test_loader
@@ -215,26 +211,22 @@ def train(model, trainer, train_loader, valid_loader, test_loader):
 
 
 if __name__ == "__main__":
-    # with open(r'sweeps/sweep.yaml') as file:
-    #     sweep_config = yaml.load(file, Loader=yaml.FullLoader)
-    #
-    # sweep_id = wandb.sweep(sweep_config, project="HPCS")
-    # # sweep_id = 'v7hcnyap'
-    # wandb.agent(sweep_id, function=sweep, count=1, project="HPCS")
-
     config = dict(
-        batch=16,
+        batch=6,
         epochs=50,
-        lr=0.001,
-        temperature=0.2,
+        lr=0.05,
+        temperature=1,
         dropout=0.0,
         fixed_points=256,
-        embedding=3,
+        embedding=6,
+        margin=0.05,
         model="vn_dgcnn_partseg",
-        dataset="shapenet",
+        dataset="partnet",
         gpu="0",
         resume=False,
         pretrained=False,
+        level=3,
+        category='Chair'
     )
 
     wandb.init(project='HPCS', config=config)
