@@ -3,6 +3,7 @@ from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_sc
 from scipy.cluster.hierarchy import fcluster
 from sklearn.metrics.cluster import normalized_mutual_info_score as nmi
 from sklearn.metrics.cluster import adjusted_rand_score as ri
+from sklearn.metrics import jaccard_score as iou
 
 from hpcs.utils.arrays import cartesian_product
 
@@ -121,8 +122,8 @@ def condense_confusion_matrix(conf_mat, input_labels, condense_list):
 ############################################################################
 
 
-def get_optimal_k(y, linkage_matrix):
-    best_ri = 0.0
+def get_optimal_k(y, linkage_matrix, index):
+    best_score = 0.0
     n_clusters = y.max() + 1
     # min_num_clusters = max(n_clusters - 1, 1)
     best_k = 0
@@ -130,13 +131,20 @@ def get_optimal_k(y, linkage_matrix):
     for k in range(1, n_clusters + 5):
         # print(k)
         y_pred = fcluster(linkage_matrix, k, criterion='maxclust') - 1
-        k_ri = ri(y, y_pred)
-        if k_ri > best_ri:
-            best_ri = k_ri
-            best_k = k
-            best_pred = y_pred
+        if index == 'ri':
+            k_score = ri(y, y_pred)
+            if k_score > best_score:
+                best_score = k_score
+                best_k = k
+                best_pred = y_pred
+        elif index == 'iou':
+            k_score = iou(y, y_pred, average='weighted')
+            if k_score > best_score:
+                best_score = k_score
+                best_k = k
+                best_pred = y_pred
 
-    return best_pred, best_k, best_ri
+    return best_pred, best_k, best_score
 
 
 def accuracy_clustering(y_true, y_pred):
@@ -194,12 +202,11 @@ def eval_clustering(y_true, Z):
     _, y_true = np.unique(y_true, return_inverse=True)
     _, y_pred = np.unique(y_pred, return_inverse=True)
 
-    # acc_score = accuracy_clustering(y_true, y_pred)
+    acc_score = accuracy_clustering(y_true, y_pred)
     pu_score = purity(y_true, y_pred)
     nmi_score = nmi(y_true, y_pred, average_method='geometric')  # average_method='arithmetic'
     ri_score = ri(y_true, y_pred)
-    # best_pred, best_k, best_ri = get_optimal_k(y_true, Z)
-    # return acc_score, pu_score, nmi_score, ri_score
-    return pu_score, nmi_score, ri_score
+    iou_score = iou(y_true, y_pred, average='weighted')
+    return ri_score, iou_score
 
 

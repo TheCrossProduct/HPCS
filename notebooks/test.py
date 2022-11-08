@@ -2,12 +2,9 @@ import argparse
 
 import pytorch_lightning as pl
 
-from hpcs.nn._hyp_hc import SimilarityHypHC
-from hpcs.nn.dgcnn import DGCNN_simple
+from hpcs.hyp_hc import SimilarityHypHC
 from hpcs.nn.dgcnn import DGCNN_partseg
 from hpcs.nn.dgcnn import VN_DGCNN_partseg
-from hpcs.nn.dgcnn import VN_DGCNN_partseg_class
-from hpcs.nn.dgcnn import VN_DGCNN_partseg_encoder
 from hpcs.nn.pointnet import POINTNET_partseg
 from hpcs.nn.pointnet import VN_POINTNET_partseg
 
@@ -23,7 +20,7 @@ def configure(config):
     parser.add_argument('--dropout', default=0.0, type=float, help='dropout in the feature extractor')
     parser.add_argument('--cosine', help='if True add use cosine dist in DynamicEdgeConv', action='store_true')
     parser.add_argument('--distance', default='cosine', type=str, help='distance to use to compute triplets')
-    parser.add_argument('--margin', default=1.0, type=float, help='margin value to use in triplet loss')
+    parser.add_argument('--margin', default=1.0, type=float, help='margin value to use in miner loss')
     parser.add_argument('--temperature', default=0.05, type=float, help='rescale softmax value used in the hyphc loss')
     parser.add_argument('--annealing', default=1.0, type=float, help='annealing factor')
     parser.add_argument('--anneal_step', default=0, type=int, help='use annealing each n step')
@@ -70,16 +67,10 @@ def configure(config):
     print("Gpu: ", gpu)
 
     out_features = embedding
-    if model_name == 'dgcnn_simple':
-        nn = DGCNN_simple(in_channels=3, out_features=out_features, k=k, dropout=dropout)
-    elif model_name == 'dgcnn_partseg':
+    if model_name == 'dgcnn_partseg':
         nn = DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout)
     elif model_name == 'vn_dgcnn_partseg':
         nn = VN_DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
-    elif model_name == 'vn_dgcnn_partseg_class':
-        nn = VN_DGCNN_partseg_class(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
-    elif model_name == 'vn_dgcnn_partseg_encoder':
-        nn = VN_DGCNN_partseg_encoder(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
     elif model_name == 'pointnet_partseg':
         nn = POINTNET_partseg(num_part=out_features, normal_channel=False)
     elif model_name == 'vn_pointnet_partseg':
@@ -87,7 +78,6 @@ def configure(config):
 
 
     model = SimilarityHypHC(nn=nn,
-                            sim_distance=distance,
                             temperature=temperature,
                             anneal=annealing,
                             anneal_step=anneal_step,

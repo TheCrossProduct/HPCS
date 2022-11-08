@@ -1,67 +1,56 @@
-import pytorch_lightning
 import torch
 from torch.nn import functional as F
-import numpy as np
-from pytorch_metric_learning.losses import BaseMetricLossFunction, TripletMarginLoss
-from pytorch_metric_learning.distances import CosineSimilarity, LpDistance
-from pytorch_metric_learning.utils import loss_and_miner_utils as lmu
-from pytorch_metric_learning import miners, losses
-from hpcs.miners.triplet_margin_miner import RandomTripletMarginMiner
-from hpcs.miners.batch_easy_miner import BatchEasyMiner
-from hpcs.miners.batch_hard_miner import BatchHardMiner
-from hpcs.miners.triplet_margin_loss import TripletMarginLoss
 
-from hpcs.distances.poincare import HyperbolicLCA
+from pytorch_metric_learning.losses import BaseMetricLossFunction, TripletMarginLoss
+from pytorch_metric_learning.distances import CosineSimilarity
+
+from hpcs.miner.triplet_margin_miner import RandomTripletMarginMiner
+from hpcs.miner.triplet_margin_loss import TripletMarginLoss
+
 from hpcs.distances.lca import hyp_lca
 
 
 class TripletHyperbolicLoss(BaseMetricLossFunction):
-    def __init__(self, sim_distance: str = 'cosine', margin: float = 1.0, scale: float = 1e-3,
-                 max_scale: float = 1. - 1e-3, temperature: float = 0.05, anneal: float = 0.5):
+    def __init__(self, margin: float = 1.0, t_per_anchor: int = 50, scale: float = 1e-3,
+                 temperature: float = 0.05, anneal_factor: float = 0.5):
         super(TripletHyperbolicLoss, self).__init__()
         self.margin = margin
+        self.t_per_anchor = t_per_anchor
         self.scale = scale
-        self.max_scale = max_scale
         self.temperature = temperature
-        self.anneal = anneal
-
-        self.hyp_miner = RandomTripletMarginMiner(distance=CosineSimilarity(), margin=0, t_per_anchor=1000, type_of_triplets='easy')
-        self.triplet_miner = RandomTripletMarginMiner(distance=CosineSimilarity(), margin=self.margin, t_per_anchor=1000, type_of_triplets='all')
+        self.anneal_factor = anneal_factor
 
         self.distance_sim = CosineSimilarity()
-        self.distance_lca = HyperbolicLCA()
 
-        self.loss_triplet_sim = TripletMarginLoss(distance=CosineSimilarity(), margin=self.margin)
+        self.hyp_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=0, t_per_anchor=self.t_per_anchor, type_of_triplets='easy')
+        self.triplet_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=self.margin, t_per_anchor=self.t_per_anchor, type_of_triplets='all')
+
+        self.loss_triplet_sim = TripletMarginLoss(distance=self.distance_sim, margin=self.margin)
 
 
     def anneal_temperature(self):
         min_scale = 0.2
-        max_scale = 0.8
-        self.temperature *= self.anneal
+        max_scale = 1
+        self.temperature *= torch.clamp(self.anneal_factor, min_scale, max_scale)
         return self.temperature
 
     def normalize_embeddings(self, embeddings):
         """Normalize leaves embeddings to have the lie on a diameter."""
         min_scale = 1e-4
-        max_scale = self.max_scale
+        max_scale = 1
         return F.normalize(embeddings, p=2, dim=1) * torch.clamp(self.scale, min_scale, max_scale)
 
-    def compute_loss(self, embeddings, labels, indices_tuple, ref_emb, ref_labels, t_per_anchor):
+    def compute_loss(self, embeddings, labels):
         triplet_indices_tuple = self.triplet_miner(embeddings, labels)
         hyp_indices_tuple = self.hyp_miner(embeddings, labels)
 
         anchor_idx, positive_idx, negative_idx = hyp_indices_tuple
 
         mat_sim = 0.5 * (1 + self.distance_sim(embeddings))
-        # mat_lca = self.distance_lca(self.normalize_embeddings(embeddings))
 
         wij = mat_sim[anchor_idx, positive_idx]
         wik = mat_sim[anchor_idx, negative_idx]
         wjk = mat_sim[positive_idx, negative_idx]
-
-        # dij = mat_lca[anchor_idx, positive_idx]
-        # dik = mat_lca[anchor_idx, negative_idx]
-        # djk = mat_lca[positive_idx, negative_idx]
 
         e1 = embeddings[anchor_idx]
         e2 = embeddings[positive_idx]
@@ -89,8 +78,12 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
         return {
             "loss_lca": {
                 "losses": loss_triplet_lca,
+                "indices": hyp_indices_tuple,
+                "reduction_type": "already_reduced",
             },
             "loss_sim": {
                 "losses": loss_triplet_sim,
+                "indices": triplet_indices_tuple,
+                "reduction_type": "already_reduced",
             },
         }

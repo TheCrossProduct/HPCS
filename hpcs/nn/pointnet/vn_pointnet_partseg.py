@@ -9,7 +9,7 @@ from hpcs.nn.pointnet.utils.vn_dgcnn_util import get_graph_feature_cross
 
 
 class VN_POINTNET_partseg(nn.Module):
-    def __init__(self, normal_channel, num_part, k, pooling):
+    def __init__(self, num_part, normal_channel, k, pooling):
         super(VN_POINTNET_partseg, self).__init__()
         self.normal_channel = normal_channel
         self.num_part = num_part

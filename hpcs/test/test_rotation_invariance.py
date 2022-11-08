@@ -23,22 +23,6 @@ def to_categorical(y, num_classes):
         return new_y.cuda()
     return new_y
 
-# path = osp.join(osp.dirname(osp.realpath(__file__)), 'data', 'ShapeNet/raw')
-#
-# nn = VN_DGCNN_partseg(in_channels=3, out_features=2, k=10, dropout=0.5, pooling='mean')
-# train_dataset = PartNormalDataset(root=path, npoints=256, split='train', class_choice='Airplane')
-# airplane_sample = train_dataset.__getitem__(0)
-#
-# x = airplane_sample.x  ## 3D coordinates of the airplane
-# R = get_rot(np.random.rand())
-# R = torch.from_numpy(R)
-#
-# y_1 = nn(x)
-# y_2 = nn((R@x.T).T) # need to verify the dimensions
-#
-# print(y_1 == y_2) ## to test --> this ensure invariance under rotation
-#
-
 class TestRotationInvariance(unittest.TestCase):
     def setUp(self) -> None:
         path = osp.join(osp.dirname(osp.realpath(__file__)), '../../data', 'ShapeNet/raw')
@@ -49,6 +33,7 @@ class TestRotationInvariance(unittest.TestCase):
         airplane_sample = train_dataset.__getitem__(0)
 
         self.points, self.label, self.target = airplane_sample  ## 3D coordinates of the airplane
+        print(self.points.size())
 
     def test_invariance(self):
         R = get_rot(np.random.rand())

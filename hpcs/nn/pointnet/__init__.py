@@ -1,4 +1,5 @@
 __all__ = [
+    'POINTNET_partseg',
     'VN_POINTNET_partseg',
 ]
 

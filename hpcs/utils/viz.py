@@ -280,45 +280,34 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, y_pred=
 
     k_ri_score = ri(y, y_pred)
 
-    # if k != n_clusters:
-    #     y_pred_at_n = fcluster(linkage_matrix, n_clusters, criterion='maxclust') - 1
-    #     val_ri_score = ri(y, y_pred_at_n)
-    #     n_plots = 5
-    # else:
-    #     val_ri_score = k_ri_score
-    #     n_plots = 4
-
     n_plots = 5
-    # plot prediction
+
     idx = 1
     fig = plt.figure(figsize=(5 * n_plots, 5))
     ax = plt.subplot(1, n_plots, idx)
     plot_clustering(x, y)
     ax.set_title('Ground Truth')
+
     idx += 1
     ax = plt.subplot(1, n_plots, idx)
     plot_clustering(x, y_pred)
-    ax.set_title(f'Pred: RI@{k}: {k_ri_score:.3f}')
-    # if k != n_clusters:
-    #     idx += 1
-    #     ax = plt.subplot(1, n_plots, idx)
-    #     plot_clustering(x, y_pred_at_n)
-    #     ax.set_title(f'Pred {n_clusters}: RI@{n_clusters}: {val_ri_score:.3f}')
+    ax.set_title(f'Pred: Score@{k}: {k_ri_score:.3f}')
 
     idx += 1
     ax = plt.subplot(1, n_plots, idx)
     plot_tsne(emb_hidden, y_pred)
     ax.set_title('Embedding')
+
     idx += 1
     ax = plt.subplot(1, n_plots, idx)
     plot_tsne(emb_poincare, y_pred)
-    # ax.set_xlim(-1 - 1e-1, 1 + 1e-1)
-    # ax.set_ylim(-1 - 1e-1, 1 + 1e-1)
     ax.set_title('Poincaré')
+
     idx += 1
     ax = plt.subplot(1, n_plots, idx)
     plot_dendrogram(linkage_matrix, n_clusters=k)
     ax.set_title(f'Dendrogram {k}-clusters')
+
     plt.tight_layout()
     if show:
         plt.show()

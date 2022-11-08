@@ -8,7 +8,7 @@ _wandb:
     is_jupyter_run: false
     is_kaggle_kernel: false
     python_version: 3.10.4
-    start_time: 1667826344.355918
+    start_time: 1667832414.424231
     t:
       1:
       - 1
@@ -48,7 +48,7 @@ category:
   value: Chair
 dataset:
   desc: null
-  value: partnet
+  value: shapenet
 dropout:
   desc: null
   value: 0.0
@@ -75,7 +75,7 @@ level:
   value: 3
 lr:
   desc: null
-  value: 0.05
+  value: 0.005
 margin:
   desc: null
   value: 0.05
