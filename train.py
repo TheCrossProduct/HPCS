@@ -34,6 +34,7 @@ def configure():
     parser.add_argument('--k', '-k', default=10, type=int, help='if model dgcnn, k is the number of neigh to take into account')
     parser.add_argument('--margin', '-margin', default=0.05, type=float, help='margin value to use in miner loss')
     parser.add_argument('--t_per_anchor', '-t_per_anchor', default=50, type=int, help='margin value to use in miner loss')
+    parser.add_argument('--fraction', '-fraction', default=1.2, type=float, help='number of triplets for underrepresented classes')
     parser.add_argument('--temperature', '-temperature', default=1, type=float, help='rescale softmax value used in the hyphc loss')
     parser.add_argument('--epochs', '-epochs', default=50, type=int, help='number of epochs')
     parser.add_argument('--batch', '-batch', default=6, type=int, help='batch size')
@@ -60,6 +61,7 @@ def configure():
     k = args.k
     margin = args.margin
     t_per_anchor = args.t_per_anchor
+    fraction = args.fraction
     temperature = args.temperature
     epochs = args.epochs
     batch = args.batch
@@ -76,14 +78,15 @@ def configure():
 
     if dataset == 'shapenet':
         data_folder = 'data/ShapeNet/raw'
-
         train_dataset = PartNormalDataset(root=data_folder, npoints=fixed_points, split='train', class_choice=category)
         valid_dataset = PartNormalDataset(root=data_folder, npoints=fixed_points, split='val', class_choice=category)
         test_dataset = PartNormalDataset(root=data_folder, npoints=fixed_points, split='test', class_choice=category)
 
         train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers)
         valid_loader = DataLoader(valid_dataset, batch_size=batch, shuffle=False, num_workers=num_workers)
-        test_loader = DataLoader(test_dataset, batch_size=batch, shuffle=True, num_workers=num_workers)
+        test_loader = DataLoader(test_dataset, batch_size=batch, shuffle=False, num_workers=num_workers)
+
+        num_class = len(train_dataset.seg_classes[category])
 
     elif dataset == 'partnet':
         data_folder = 'data/PartNet/sem_seg_h5/'
@@ -103,12 +106,11 @@ def configure():
         valid_loader = DataLoader(val_dataset, batch_size=batch, shuffle=False, num_workers=num_workers, drop_last=True)
         test_loader = DataLoader(test_dataset, batch_size=batch, shuffle=False, num_workers=num_workers, drop_last=True)
 
-
     out_features = embedding
     if model_name == 'dgcnn_partseg':
-        nn = DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout)
+        nn = DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout, num_class=num_class)
     elif model_name == 'vn_dgcnn_partseg':
-        nn = VN_DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean')
+        nn = VN_DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean', num_class=num_class)
     elif model_name == 'pointnet_partseg':
         nn = POINTNET_partseg(num_part=out_features, normal_channel=False)
     elif model_name == 'vn_pointnet_partseg':
@@ -125,16 +127,20 @@ def configure():
 
 
     model = SimilarityHypHC(nn=nn,
+                            model_name=model_name,
                             train_rotation=train_rotation,
                             test_rotation=test_rotation,
                             dataset=dataset,
                             lr=lr,
                             embedding=embedding,
+                            k=k,
                             margin=margin,
                             t_per_anchor=t_per_anchor,
+                            fraction=fraction,
                             temperature=temperature,
                             anneal_factor=anneal_factor,
                             anneal_step=anneal_step,
+                            num_class=num_class
                             )
 
 
@@ -148,6 +154,7 @@ def configure():
                     'k': k,
                     'margin': margin,
                     't_per_anchor': t_per_anchor,
+                    'fraction': fraction,
                     'temperature': temperature,
                     'epochs': epochs,
                     'batch': batch,
@@ -169,7 +176,6 @@ def configure():
                          max_epochs=epochs,
                          callbacks=[early_stop_callback, checkpoint_callback],
                          logger=logger,
-                         limit_test_batches=5
                          )
 
     return model, trainer, train_loader, valid_loader, test_loader, resume

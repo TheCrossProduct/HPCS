@@ -120,7 +120,13 @@ def condense_confusion_matrix(conf_mat, input_labels, condense_list):
 #                                                                          #
 # The full license is in the file LICENSE, distributed with this software. #
 ############################################################################
+import torch
 
+def remap_labels(y_true):
+    y_remap = torch.zeros_like(y_true)
+    for i, l in enumerate(torch.unique(y_true)):
+        y_remap[y_true==l] = i
+    return y_remap
 
 def get_optimal_k(y, linkage_matrix, index):
     best_score = 0.0
@@ -128,9 +134,13 @@ def get_optimal_k(y, linkage_matrix, index):
     # min_num_clusters = max(n_clusters - 1, 1)
     best_k = 0
     best_pred = None
+    y_true = remap_labels(y)
+    y_true_clusters = len(torch.unique(y_true))
     for k in range(1, n_clusters + 5):
         # print(k)
         y_pred = fcluster(linkage_matrix, k, criterion='maxclust') - 1
+        y_pred_clusters = len(torch.unique(torch.Tensor(y_pred)))
+        matrix = torch.zeros(y_true_clusters, y_pred_clusters)
         if index == 'ri':
             k_score = ri(y, y_pred)
             if k_score > best_score:
@@ -138,13 +148,21 @@ def get_optimal_k(y, linkage_matrix, index):
                 best_k = k
                 best_pred = y_pred
         elif index == 'iou':
-            k_score = iou(y, y_pred, average='weighted')
+            for i in range(y_true_clusters):
+                for j in range(y_pred_clusters):
+                    matrix[i, j] = iou(y_true==i, y_pred==j)  # matrix.shape = N x M; N true ; M pred;
+            out, ind = torch.max(matrix, dim=1) # ind.shape  0 <= N[i] <= (M - 1)
+            y_remap = np.zeros_like(y_pred)
+            for n, i in enumerate(range(y_true_clusters)):
+                y_remap[y_true==i] = ind[n]
+            # k_score = iou(y_true, y_pred, average='weighted')
+            k_score = out.mean()
             if k_score > best_score:
                 best_score = k_score
                 best_k = k
                 best_pred = y_pred
 
-    return best_pred, best_k, best_score
+    return y_remap, best_pred, best_k, best_score
 
 
 def accuracy_clustering(y_true, y_pred):

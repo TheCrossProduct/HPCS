@@ -11,19 +11,20 @@ from hpcs.distances.lca import hyp_lca
 
 
 class TripletHyperbolicLoss(BaseMetricLossFunction):
-    def __init__(self, margin: float = 1.0, t_per_anchor: int = 50, scale: float = 1e-3,
+    def __init__(self, margin: float = 1.0, t_per_anchor: int = 50, fraction: float = 1.2, scale: float = 1e-3,
                  temperature: float = 0.05, anneal_factor: float = 0.5):
         super(TripletHyperbolicLoss, self).__init__()
         self.margin = margin
         self.t_per_anchor = t_per_anchor
+        self.fraction = fraction
         self.scale = scale
         self.temperature = temperature
         self.anneal_factor = anneal_factor
 
         self.distance_sim = CosineSimilarity()
 
-        self.hyp_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=0, t_per_anchor=self.t_per_anchor, type_of_triplets='easy')
-        self.triplet_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=self.margin, t_per_anchor=self.t_per_anchor, type_of_triplets='all')
+        self.hyp_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=0, t_per_anchor=self.t_per_anchor, fraction=self.fraction, type_of_triplets='easy')
+        self.triplet_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=self.margin, t_per_anchor=self.t_per_anchor, fraction=self.fraction, type_of_triplets='all')
 
         self.loss_triplet_sim = TripletMarginLoss(distance=self.distance_sim, margin=self.margin)
 

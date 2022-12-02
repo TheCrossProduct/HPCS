@@ -7,12 +7,13 @@ from hpcs.nn.dgcnn.utils.dgcnn_util import get_graph_feature
 
 
 class DGCNN_partseg(nn.Module):
-    def __init__(self, in_channels, out_features, k, dropout):
+    def __init__(self, in_channels, out_features, k, dropout, num_class):
         super(DGCNN_partseg, self).__init__()
         self.in_channels = in_channels
         self.out_features = out_features
         self.k = k
         self.dropout = dropout
+        self.num_class = num_class
         self.transform_net = Transform_Net()
 
         self.bn1 = nn.BatchNorm2d(64)
@@ -44,7 +45,7 @@ class DGCNN_partseg(nn.Module):
         self.conv6 = nn.Sequential(nn.Conv1d(192, 1024, kernel_size=1, bias=False),
                                    self.bn6,
                                    nn.LeakyReLU(negative_slope=0.2))
-        self.conv7 = nn.Sequential(nn.Conv1d(16, 64, kernel_size=1, bias=False),
+        self.conv7 = nn.Sequential(nn.Conv1d(self.num_class, 64, kernel_size=1, bias=False),
                                    self.bn7,
                                    nn.LeakyReLU(negative_slope=0.2))
         self.conv8 = nn.Sequential(nn.Conv1d(1280, 256, kernel_size=1, bias=False),

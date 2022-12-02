@@ -1,15 +1,16 @@
 python train.py \
-  -dataset 'shapenet' \
+  -dataset 'partnet' \
   -category 'Chair' \
-  -level 3 \
-  -fixed_points 256 \
+  -level 1 \
+  -fixed_points 1024 \
   -model 'vn_dgcnn_partseg' \
   -embedding 6 \
-  -k 10 \
+  -k 20 \
   -margin 0.05 \
-  -t_per_anchor 50 \
+  -t_per_anchor 100 \
+  -fraction 1.2 \
   -temperature 1 \
-  -epochs 50 \
-  -batch 6 \
+  -epochs 25 \
+  -batch 2 \
   -lr 0.005 \
   -accelerator 'gpu'

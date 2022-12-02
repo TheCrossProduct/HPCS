@@ -33,7 +33,6 @@ class TestRotationInvariance(unittest.TestCase):
         airplane_sample = train_dataset.__getitem__(0)
 
         self.points, self.label, self.target = airplane_sample  ## 3D coordinates of the airplane
-        print(self.points.size())
 
     def test_invariance(self):
         R = get_rot(np.random.rand())
@@ -42,6 +41,7 @@ class TestRotationInvariance(unittest.TestCase):
         label = to_categorical(label, self.num_classes)
         label = label[None, ...]
         points = torch.from_numpy(self.points)
+        points = points.transpose(2, 1)
         points = points[None, ...] ## moves from [n_pts, 3] -> [1, n_, 3pts, 3]
 
         y_1 = self.nn(points, label)

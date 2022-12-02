@@ -5,7 +5,7 @@ from pytorch_metric_learning.utils import common_functions as c_f
 
 # sample triplets, with a weighted distribution if weights is specified.
 def get_balanced_random_triplet_indices(
-        labels, ref_labels=None, t_per_anchor=None, weights=None
+        labels, ref_labels=None, t_per_anchor=None, fraction=None, weights=None
 ):
     a_idx, p_idx, n_idx = [], [], []
     labels_device = labels.device
@@ -27,7 +27,7 @@ def get_balanced_random_triplet_indices(
         if (n_p < min_required_p) or (len(n_inds) < 1):
             continue
 
-        k = n_p if t_per_anchor is None else int(t_per_anchor * torch.pow((max / n_a), 1.2))
+        k = n_p if t_per_anchor is None else int(t_per_anchor * torch.pow((max / n_a), fraction))
         num_triplets = n_a * k
 
         p_inds_ = p_inds.expand((n_a, n_p))

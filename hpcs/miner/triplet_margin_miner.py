@@ -4,13 +4,15 @@ from hpcs.miner.loss_and_miner_utils import get_balanced_random_triplet_indices
 
 
 class RandomTripletMarginMiner(miners.TripletMarginMiner):
-    def __init__(self, t_per_anchor, margin=0.2, type_of_triplets="all", **kwargs):
+    def __init__(self, t_per_anchor, fraction, margin=0.2, type_of_triplets="all", **kwargs):
         super().__init__(margin=margin, type_of_triplets=type_of_triplets, **kwargs)
         self.t_per_anchor = t_per_anchor
+        self.fraction = fraction
 
 
     def mine(self, embeddings, labels, ref_emb, ref_labels):
-        anchor_idx, positive_idx, negative_idx = get_balanced_random_triplet_indices(labels=labels, ref_labels=None, t_per_anchor=self.t_per_anchor)
+        anchor_idx, positive_idx, negative_idx = get_balanced_random_triplet_indices(labels=labels, ref_labels=None,
+                                                                                     fraction=self.fraction, t_per_anchor=self.t_per_anchor)
         mat = self.distance(embeddings, ref_emb)
         ap_dist = mat[anchor_idx, positive_idx]
         an_dist = mat[anchor_idx, negative_idx]

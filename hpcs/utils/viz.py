@@ -14,7 +14,9 @@ from sklearn.metrics.cluster import adjusted_rand_score as ri
 from sklearn.manifold import TSNE
 from scipy.sparse import find
 
-COLORS = np.array(['#377eb8', '#ff7f00', '#4daf4a', '#a65628', '#f781bf', '#984ea3', '#999999', '#e41a1c', '#000000', '#dede00', '#116881', '#101a79', '#da55ba', '#5ac18e'])
+COLORS = np.array(['#377eb8', '#ff7f00', '#4daf4a', '#a65628', '#f781bf', '#984ea3', '#999999', '#e41a1c', '#000000',
+                   '#dede00', '#116881', '#101a79', '#da55ba', '#5ac18e', '#6E33FF', '#33E6FF', '#B4F83D', '#1024B3',
+                   '#036C2E', '#616161', '#F2EB00', '#BF3131', '#ADBF31', '#96F310', '#10BFF3', '#7C7C7C', '#400016'])
 
 
 def plot_cloud(xyz,
@@ -296,12 +298,12 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, y_pred=
     idx += 1
     ax = plt.subplot(1, n_plots, idx)
     plot_tsne(emb_hidden, y_pred)
-    ax.set_title('Embedding')
+    ax.set_title('TSNE Embedding')
 
     idx += 1
     ax = plt.subplot(1, n_plots, idx)
     plot_tsne(emb_poincare, y_pred)
-    ax.set_title('Poincaré')
+    ax.set_title('TSNE Poincaré Ball')
 
     idx += 1
     ax = plt.subplot(1, n_plots, idx)
