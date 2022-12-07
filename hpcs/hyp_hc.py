@@ -15,6 +15,14 @@ from hpcs.utils.viz import plot_hyperbolic_eval
 from hpcs.utils.scores import get_optimal_k
 
 
+def to_categorical(y, num_classes):
+    """ 1-hot encodes a tensor """
+    new_y = torch.eye(num_classes)[y.cpu().data.numpy(),]
+    if (y.is_cuda):
+        return new_y.cuda()
+    return new_y
+
+
 class SimilarityHypHC(pl.LightningModule):
     """
     Args:
@@ -106,13 +114,17 @@ class SimilarityHypHC(pl.LightningModule):
         points, label, targets = points.float().to(device), label.long().to(device), targets.long().to(device)
         points = points.transpose(2, 1)
 
-        num_parts = self.num_class
-        batch_class_vector = []
-        for object in targets:
-            parts = F.one_hot(torch.unique(object), num_parts)
-            class_vector = parts.sum(dim=0).float()
-            batch_class_vector.append(class_vector)
-        decode_vector = torch.stack(batch_class_vector)
+        if self.dataset == 'shapenet':
+            num_categories = 16
+            decode_vector = to_categorical(label, num_categories)
+        elif self.dataset == 'partnet':
+            num_parts = self.num_class
+            batch_class_vector = []
+            for object in targets:
+                parts = F.one_hot(torch.unique(object), num_parts)
+                class_vector = parts.sum(dim=0).float()
+                batch_class_vector.append(class_vector)
+            decode_vector = torch.stack(batch_class_vector)
 
         x_embedding = self.model(points, decode_vector)
         x_poincare = project(self.scale * x_embedding)
@@ -150,13 +162,17 @@ class SimilarityHypHC(pl.LightningModule):
         points, label, targets = points.float().to(device), label.long().to(device), targets.long().to(device)
         points = points.transpose(2, 1)
 
-        num_parts = self.num_class
-        batch_class_vector = []
-        for object in targets:
-            parts = F.one_hot(torch.unique(object), num_parts)
-            class_vector = parts.sum(dim=0).float()
-            batch_class_vector.append(class_vector)
-        decode_vector = torch.stack(batch_class_vector)
+        if self.dataset == 'shapenet':
+            num_categories = 16
+            decode_vector = to_categorical(label, num_categories)
+        elif self.dataset == 'partnet':
+            num_parts = self.num_class
+            batch_class_vector = []
+            for object in targets:
+                parts = F.one_hot(torch.unique(object), num_parts)
+                class_vector = parts.sum(dim=0).float()
+                batch_class_vector.append(class_vector)
+            decode_vector = torch.stack(batch_class_vector)
 
         x_embedding = self.model(points, decode_vector)
         x_poincare = project(self.scale * x_embedding)
@@ -222,7 +238,7 @@ class SimilarityHypHC(pl.LightningModule):
 
         indexes = []
         for object_idx in range(points.size(0)):
-            y_remap, best_pred, best_k, best_score = get_optimal_k(targets[object_idx].cpu(), linkage_matrix[object_idx], 'iou')
+            best_pred, best_k, best_score = get_optimal_k(targets[object_idx].cpu(), linkage_matrix[object_idx], 'iou')
             # iou_score, ri_score = eval_clustering(targets[object_idx].cpu(), linkage_matrix[object_idx])
 
             plot_hyperbolic_eval(x=points[object_idx].T.cpu(),
@@ -232,6 +248,7 @@ class SimilarityHypHC(pl.LightningModule):
                                  emb_poincare=self.triplet_loss.normalize_embeddings(x_poincare[object_idx]).cpu(),
                                  linkage_matrix=linkage_matrix[object_idx],
                                  k=best_k,
+                                 score=best_score,
                                  show=True)
 
             indexes.append(best_score)

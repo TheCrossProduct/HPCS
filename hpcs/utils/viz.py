@@ -268,7 +268,7 @@ def plot_graph(x, edge_index, edge_col):
     ax.scatter(xout[:, 0], xout[:, 1], s=20, c='w', edgecolors='k')
 
 
-def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, y_pred=None, k=-1, show=True):
+def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, y_pred=None, k=-1, show=True):
     """
     Auxiliary functions to plot results about hyperbolic clustering
     """
@@ -279,8 +279,6 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, y_pred=
 
     if y_pred is None:
         y_pred = fcluster(linkage_matrix, n_clusters, criterion='maxclust') - 1
-
-    k_ri_score = ri(y, y_pred)
 
     n_plots = 5
 
@@ -293,7 +291,7 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, y_pred=
     idx += 1
     ax = plt.subplot(1, n_plots, idx)
     plot_clustering(x, y_pred)
-    ax.set_title(f'Pred: Score@{k}: {k_ri_score:.3f}')
+    ax.set_title(f'Pred: Score@{k}: {score:.3f}')
 
     idx += 1
     ax = plt.subplot(1, n_plots, idx)

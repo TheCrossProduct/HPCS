@@ -162,7 +162,7 @@ def get_optimal_k(y, linkage_matrix, index):
                 best_k = k
                 best_pred = y_pred
 
-    return y_remap, best_pred, best_k, best_score
+    return best_pred, best_k, best_score
 
 
 def accuracy_clustering(y_true, y_pred):

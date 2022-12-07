@@ -86,7 +86,7 @@ def configure():
         valid_loader = DataLoader(valid_dataset, batch_size=batch, shuffle=False, num_workers=num_workers)
         test_loader = DataLoader(test_dataset, batch_size=batch, shuffle=False, num_workers=num_workers)
 
-        num_class = len(train_dataset.seg_classes[category])
+        num_class = 16
 
     elif dataset == 'partnet':
         data_folder = 'data/PartNet/sem_seg_h5/'
@@ -187,7 +187,7 @@ def train(model, trainer, train_loader, valid_loader, test_loader, resume):
         os.remove('model.ckpt')
 
     if resume:
-        wandb.restore('model.ckpt', root=os.getcwd(), run_path='pierreoo/HPCS/runs/2v2xt8is')
+        wandb.restore('model.ckpt', root=os.getcwd(), run_path='princepi/HPCS/runs/1zvcmsdj')
         model = model.load_from_checkpoint('model.ckpt')
 
     trainer.fit(model, train_loader, valid_loader)

@@ -24,13 +24,14 @@ def configure(config):
     accelerator = 'cpu'
     anneal_factor = config['anneal_factor']['value']
     anneal_step = config['anneal_step']['value']
+    num_class = config['num_class']['value']
 
 
     out_features = embedding
     if model_name == 'dgcnn_partseg':
-        nn = DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=0.5)
+        nn = DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=0.5, num_class=num_class)
     elif model_name == 'vn_dgcnn_partseg':
-        nn = VN_DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=0.5, pooling='mean')
+        nn = VN_DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=0.5, pooling='mean', num_class=num_class)
     elif model_name == 'pointnet_partseg':
         nn = POINTNET_partseg(num_part=out_features, normal_channel=False)
     elif model_name == 'vn_pointnet_partseg':
@@ -47,11 +48,12 @@ def configure(config):
                             temperature=temperature,
                             anneal_factor=anneal_factor,
                             anneal_step=anneal_step,
+                            num_class=num_class
                             )
 
     trainer = pl.Trainer(accelerator=accelerator,
                          max_epochs=-1,
-                         limit_test_batches=8
+                         limit_test_batches=10
                          )
 
     return model, trainer
