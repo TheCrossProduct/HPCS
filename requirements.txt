@@ -97,9 +97,6 @@ matplotlib==3.5.2
 matplotlib-inline==0.1.3
 mccabe==0.7.0
 mistune==0.8.4
-mkl-fft==1.3.1
-mkl-random==1.2.2
-mkl-service==2.4.0
 mpmath==1.2.1
 multidict==6.0.2
 mypy-extensions==0.4.3
