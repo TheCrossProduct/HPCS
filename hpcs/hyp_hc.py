@@ -22,6 +22,12 @@ def to_categorical(y, num_classes):
         return new_y.cuda()
     return new_y
 
+def remap_labels(y_true):
+    y_remap = torch.zeros_like(y_true)
+    for i, l in enumerate(torch.unique(y_true)):
+        y_remap[y_true==l] = i
+    return y_remap
+
 
 class SimilarityHypHC(pl.LightningModule):
     """
@@ -115,8 +121,13 @@ class SimilarityHypHC(pl.LightningModule):
         points = points.transpose(2, 1)
 
         if self.dataset == 'shapenet':
-            num_categories = 16
-            decode_vector = to_categorical(label, num_categories)
+            num_parts = self.num_class
+            batch_class_vector = []
+            for object in targets:
+                parts = F.one_hot(remap_labels(torch.unique(object)), num_parts)
+                class_vector = parts.sum(dim=0).float()
+                batch_class_vector.append(class_vector)
+            decode_vector = torch.stack(batch_class_vector)
         elif self.dataset == 'partnet':
             num_parts = self.num_class
             batch_class_vector = []
@@ -163,8 +174,13 @@ class SimilarityHypHC(pl.LightningModule):
         points = points.transpose(2, 1)
 
         if self.dataset == 'shapenet':
-            num_categories = 16
-            decode_vector = to_categorical(label, num_categories)
+            num_parts = self.num_class
+            batch_class_vector = []
+            for object in targets:
+                parts = F.one_hot(remap_labels(torch.unique(object)), num_parts)
+                class_vector = parts.sum(dim=0).float()
+                batch_class_vector.append(class_vector)
+            decode_vector = torch.stack(batch_class_vector)
         elif self.dataset == 'partnet':
             num_parts = self.num_class
             batch_class_vector = []

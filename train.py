@@ -16,6 +16,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from hpcs.hyp_hc import SimilarityHypHC
 from hpcs.nn.dgcnn import DGCNN_partseg
 from hpcs.nn.dgcnn import VN_DGCNN_partseg
+from hpcs.nn.dgcnn import VN_DGCNN_hmodel
 from hpcs.nn.pointnet import POINTNET_partseg
 from hpcs.nn.pointnet import VN_POINTNET_partseg
 
@@ -82,11 +83,11 @@ def configure():
         valid_dataset = PartNormalDataset(root=data_folder, npoints=fixed_points, split='val', class_choice=category)
         test_dataset = PartNormalDataset(root=data_folder, npoints=fixed_points, split='test', class_choice=category)
 
-        train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers)
-        valid_loader = DataLoader(valid_dataset, batch_size=batch, shuffle=False, num_workers=num_workers)
-        test_loader = DataLoader(test_dataset, batch_size=batch, shuffle=False, num_workers=num_workers)
+        train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers, drop_last=True)
+        valid_loader = DataLoader(valid_dataset, batch_size=batch, shuffle=False, num_workers=num_workers, drop_last=True)
+        test_loader = DataLoader(test_dataset, batch_size=batch, shuffle=False, num_workers=num_workers, drop_last=True)
 
-        num_class = 16
+        num_class = len(train_dataset.seg_classes[category])
 
     elif dataset == 'partnet':
         data_folder = 'data/PartNet/sem_seg_h5/'
@@ -111,6 +112,8 @@ def configure():
         nn = DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout, num_class=num_class)
     elif model_name == 'vn_dgcnn_partseg':
         nn = VN_DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean', num_class=num_class)
+    elif model_name == 'vn_dgcnn_hmodel':
+        nn = VN_DGCNN_hmodel(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean', num_class=num_class)
     elif model_name == 'pointnet_partseg':
         nn = POINTNET_partseg(num_part=out_features, normal_channel=False)
     elif model_name == 'vn_pointnet_partseg':
@@ -120,9 +123,9 @@ def configure():
         model_path = osp.realpath('model.partseg.vn_dgcnn.aligned.t7')
         checkpoint = torch.load(model_path)
         new_state_dict = OrderedDict()
-        for k, v in checkpoint.items():
-            name = k.replace('module.', '')
-            new_state_dict[name] = v
+        for key, value in checkpoint.items():
+            name = key.replace('module.', '')
+            new_state_dict[name] = value
         nn.load_state_dict(new_state_dict, strict=False)
 
 
@@ -176,6 +179,7 @@ def configure():
                          max_epochs=epochs,
                          callbacks=[early_stop_callback, checkpoint_callback],
                          logger=logger,
+                         limit_test_batches=10
                          )
 
     return model, trainer, train_loader, valid_loader, test_loader, resume

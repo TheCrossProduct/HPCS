@@ -5,6 +5,7 @@ import pytorch_lightning as pl
 from hpcs.hyp_hc import SimilarityHypHC
 from hpcs.nn.dgcnn import DGCNN_partseg
 from hpcs.nn.dgcnn import VN_DGCNN_partseg
+from hpcs.nn.dgcnn import VN_DGCNN_partseg_hmodel
 from hpcs.nn.pointnet import POINTNET_partseg
 from hpcs.nn.pointnet import VN_POINTNET_partseg
 
@@ -32,6 +33,8 @@ def configure(config):
         nn = DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=0.5, num_class=num_class)
     elif model_name == 'vn_dgcnn_partseg':
         nn = VN_DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=0.5, pooling='mean', num_class=num_class)
+    elif model_name == 'vn_dgcnn_partseg_hmodel':
+        nn = VN_DGCNN_partseg_hmodel(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean', num_class=num_class)
     elif model_name == 'pointnet_partseg':
         nn = POINTNET_partseg(num_part=out_features, normal_channel=False)
     elif model_name == 'vn_pointnet_partseg':
