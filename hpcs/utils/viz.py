@@ -1,6 +1,7 @@
 import itertools
 import numpy as np
 import pyvista as pv
+import torch
 from pyvistaqt import BackgroundPlotter
 import matplotlib as mpl
 import colorsys
@@ -272,6 +273,16 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, 
     """
     Auxiliary functions to plot results about hyperbolic clustering
     """
+    if isinstance(x, torch.Tensor):
+        pts = x.cpu().detach().numpy()
+    else:
+        pts = x
+
+    if isinstance(y, torch.Tensor):
+        y_true = y.cpu().detach().numpy()
+    else:
+        y_true = y
+
     n_clusters = y.max() + 1
 
     if k == -1:
@@ -282,37 +293,63 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, 
 
     n_plots = 5
 
+    plotter = pv.Plotter(title='Prediction', shape=(1, 5), window_size=(2000, 400))
+
     idx = 1
-    fig = plt.figure(figsize=(5 * n_plots, 5))
-    ax = plt.subplot(1, n_plots, idx)
-    plot_clustering(x, y)
-    ax.set_title('Ground Truth')
+    # fig = plt.figure(figsize=(5 * n_plots, 5))
+    # ax = plt.subplot(1, n_plots, idx)
+    # plot_clustering(x, y)
+    # ax.set_title('Ground Truth')
+    plotter.subplot(0, 0)
+    plotter.add_text('Ground Truth')
+    data = pv.PolyData(pts)
+    cmap_true = list(COLORS[np.unique(y_true) % len(COLORS)])
+    plotter.add_mesh(data, scalars=y_true, render_points_as_spheres=True, point_size=5.0, cmap=cmap_true, scalar_bar_args={'title': 'GT Classes'})
 
     idx += 1
-    ax = plt.subplot(1, n_plots, idx)
-    plot_clustering(x, y_pred)
-    ax.set_title(f'Pred: Score@{k}: {score:.3f}')
+    # ax = plt.subplot(1, n_plots, idx)
+    # plot_clustering(x, y_pred)
+    # ax.set_title(f'Pred: Score@{k}: {score:.3f}')
+    plotter.subplot(0, 1)
+    plotter.add_text(f'Pred: Score@{k}: {score:.3f}')
+    data = pv.PolyData(pts)
+    cmap_pred = list(COLORS[np.unique(y_pred) % len(COLORS)])
+    plotter.add_mesh(data, scalars=y_pred, cmap=cmap_pred, render_points_as_spheres=True, point_size=5.0,
+                     scalar_bar_args={'title': 'Pred Classes'})
 
     idx += 1
-    ax = plt.subplot(1, n_plots, idx)
+    plotter.subplot(0, 2)
+    f, ax = plt.subplots(tight_layout=True)
     plot_tsne(emb_hidden, y_pred)
     ax.set_title('TSNE Embedding')
 
+    chart = pv.ChartMPL(f)
+    chart.background_color = 'w'
+    plotter.add_chart(chart)
+
     idx += 1
-    ax = plt.subplot(1, n_plots, idx)
+    plotter.subplot(0, 3)
+    f, ax = plt.subplots(tight_layout=True)
     plot_tsne(emb_poincare, y_pred)
     ax.set_title('TSNE Poincaré Ball')
+    chart = pv.ChartMPL(f)
+    chart.background_color = 'w'
+    plotter.add_chart(chart)
+
 
     idx += 1
-    ax = plt.subplot(1, n_plots, idx)
+    plotter.subplot(0, 4)
+    f, ax = plt.subplots(tight_layout=True)
     plot_dendrogram(linkage_matrix, n_clusters=k)
     ax.set_title(f'Dendrogram {k}-clusters')
+    chart = pv.ChartMPL(f)
+    chart.background_color = 'w'
+    plotter.add_chart(chart)
 
-    plt.tight_layout()
     if show:
-        plt.show()
+        plotter.show()
     else:
-        return fig
+        return plotter
 
 
 def plot_confusion_matrix(cm, classes,
@@ -492,65 +529,3 @@ def get_linkage(model, **kwargs):
     linkage_matrix = np.column_stack([model.children_, model.distances_,
                                       counts]).astype(float)
     return [linkage_matrix]
-
-
-def noise_robustness(model, name, length=20, max_samples=300, seed=0, filename=''):
-    from hpcs.nn.models import SimilarityHypHC
-    from hpcs.utils.scores import get_optimal_k, eval_clustering
-    from hpcs.data import ToyDatasets
-    # generating a sample and evaluating model
-    noises = np.linspace(0, 0.16, 17)
-    ri_scores_at_k = np.zeros_like(noises)
-    acc_scores_at_k = np.zeros_like(noises)
-    nmi_scores_at_k = np.zeros_like(noises)
-    best_ri_scores = np.zeros_like(noises)
-
-    ri_scores_at_k_std = np.zeros_like(noises)
-    acc_scores_at_k_std = np.zeros_like(noises)
-    nmi_scores_at_k_std = np.zeros_like(noises)
-    best_ri_scores_std = np.zeros_like(noises)
-    for m, noise in enumerate(noises):
-        dataset = ToyDatasets(name=name, length=length, noise=noise, cluster_std=noise,
-                              max_samples=max_samples, num_labels=0.3, seed=seed, num_blobs=9)
-        ri_scores_n = np.zeros(length)
-        acc_scores_n = np.zeros(length)
-        nmi_scores_n = np.zeros(length)
-        best_ri_scores_n = np.zeros(length)
-        for n, data in enumerate(dataset):
-            if isinstance(model, SimilarityHypHC):
-                x_emb, loss_triplet, loss_hyhc, Z = model(data.x, data.y, decode=True)
-            else:
-                mod = model.fit(data.x)
-                Z = get_linkage(mod, truncate_mode='level', p=3)
-            y_pred, num_cluster, ri_score = get_optimal_k(data.y.detach().numpy(), Z[0])
-            #             acc_score, pu_score, nmi_score, ri_at_k = eval_clustering(data.y.detach().numpy(), Z[0])
-            pu_score, nmi_score, ri_at_k = eval_clustering(data.y.detach().numpy(), Z[0])
-
-            best_ri_scores_n[n] = ri_score
-            ri_scores_n[n] = ri_at_k
-            acc_scores_n[n] = pu_score
-            nmi_scores_n[n] = nmi_score
-
-        ri_scores_at_k[m] = ri_scores_n.mean()
-        acc_scores_at_k[m] = acc_scores_n.mean()
-        nmi_scores_at_k[m] = nmi_scores_n.mean()
-        best_ri_scores[m] = best_ri_scores_n.mean()
-
-        ri_scores_at_k_std[m] = ri_scores_n.std()
-        acc_scores_at_k_std[m] = acc_scores_n.std()
-        nmi_scores_at_k_std[m] = nmi_scores_n.std()
-        best_ri_scores_std[m] = best_ri_scores_n.std()
-
-    if filename:
-        data = {'noises': noises,
-                'ri_scores_at_k': ri_scores_at_k,
-                'acc_scores_at_k': acc_scores_at_k,
-                'nmi_scores_at_k': nmi_scores_at_k,
-                'best_ri_scores': best_ri_scores,
-                'ri_scores_at_k_std': ri_scores_at_k_std,
-                'acc_scores_at_k_std': acc_scores_at_k_std,
-                'nmi_scores_at_k_std': nmi_scores_at_k_std,
-                'best_ri_scores_std': best_ri_scores_std}
-        np.savez(filename, **data)
-
-    return noises, ri_scores_at_k, acc_scores_at_k, nmi_scores_at_k, best_ri_scores, ri_scores_at_k_std, acc_scores_at_k_std, nmi_scores_at_k_std, best_ri_scores_std
