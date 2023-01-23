@@ -36,10 +36,23 @@ def roll_rot(gamma: Union[float, torch.Tensor]) -> torch.Tensor:
     ])
 
 
-def rot_3D(alpha: float, beta: float, gamma: float) -> torch.Tensor:
-    R_yaw = yaw_rot(alpha)
-    R_pitch = pitch_rot(beta)
-    R_roll = roll_rot(gamma)
+def rot_3D(yaw: Union[float, torch.Tensor], pitch: Union[float, torch.Tensor], roll: Union[float, torch.Tensor]) -> torch.Tensor:
+    """
+    Function that return a 3D rotation matrix from yaw, pitch and roll rotation angles
+
+    Parameters
+    ----------
+    yaw: yaw angle
+    pitch: pitch angle
+    roll: roll angle
+
+    Returns
+    -------
+    rot_mat: torch.Tensor
+    """
+    R_yaw = yaw_rot(yaw)
+    R_pitch = pitch_rot(pitch)
+    R_roll = roll_rot(roll)
     return R_yaw @ R_pitch @ R_roll
 
 

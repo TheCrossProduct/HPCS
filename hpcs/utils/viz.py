@@ -305,6 +305,7 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, 
     data = pv.PolyData(pts)
     cmap_true = list(COLORS[np.unique(y_true) % len(COLORS)])
     plotter.add_mesh(data, scalars=y_true, render_points_as_spheres=True, point_size=5.0, cmap=cmap_true, scalar_bar_args={'title': 'GT Classes'})
+    plotter.camera_position = 'xy'
 
     idx += 1
     # ax = plt.subplot(1, n_plots, idx)
@@ -316,7 +317,7 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, 
     cmap_pred = list(COLORS[np.unique(y_pred) % len(COLORS)])
     plotter.add_mesh(data, scalars=y_pred, cmap=cmap_pred, render_points_as_spheres=True, point_size=5.0,
                      scalar_bar_args={'title': 'Pred Classes'})
-
+    plotter.camera_position = 'xy'
     idx += 1
     plotter.subplot(0, 2)
     f, ax = plt.subplots(tight_layout=True)
@@ -345,6 +346,8 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, 
     chart = pv.ChartMPL(f)
     chart.background_color = 'w'
     plotter.add_chart(chart)
+
+    plotter.show_axes_all()
 
     if show:
         plotter.show()
