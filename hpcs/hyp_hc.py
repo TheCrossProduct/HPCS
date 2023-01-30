@@ -65,7 +65,8 @@ class SimilarityHypHC(pl.LightningModule):
 
     def __init__(self, nn: torch.nn.Module, model_name: str = 'vn_dgcnn_partseg', train_rotation: str = 'so3', test_rotation: str = 'so3',
                  dataset: str = 'shapenet', lr: float = 1e-3, embedding: int = 6, k: int = 10, margin: float = 1.0, t_per_anchor: int = 50,
-                 fraction: float = 1.2, temperature: float = 0.05, anneal_factor: float = 0.5, anneal_step: int = 0, num_class: int = 4):
+                 fraction: float = 1.2, temperature: float = 0.05, anneal_factor: float = 0.5, anneal_step: int = 0, num_class: int = 4,
+                 normalise: bool = False):
         super(SimilarityHypHC, self).__init__()
         self.save_hyperparameters()
         self.model = nn
@@ -83,14 +84,19 @@ class SimilarityHypHC(pl.LightningModule):
         self.anneal_factor = anneal_factor
         self.anneal_step = anneal_step
         self.num_class = num_class
-        self.scale = torch.nn.Parameter(torch.Tensor([1e-3]), requires_grad=True)
+        self.normalise = normalise
+        if self.normalise:
+            self.scale = torch.nn.Parameter(torch.Tensor([1e-3]), requires_grad=True)
+        else:
+            self.scale = torch.Tensor([1.0])
 
         self.triplet_loss = TripletHyperbolicLoss(margin=self.margin,
                                                   t_per_anchor=self.t_per_anchor,
                                                   fraction=self.fraction,
                                                   scale=self.scale,
                                                   temperature=self.temperature,
-                                                  anneal_factor=self.anneal_factor)
+                                                  anneal_factor=self.anneal_factor,
+                                                  normalise=self.normalise)
 
     def _decode_linkage(self, leaves_embeddings):
         """Build linkage matrix from leaves' embeddings. Assume points are normalized to same radius."""
@@ -138,7 +144,11 @@ class SimilarityHypHC(pl.LightningModule):
             decode_vector = torch.stack(batch_class_vector)
 
         x_embedding = self.model(points, decode_vector)
-        x_poincare = project(self.scale * x_embedding)
+
+        if self.normalise:
+            x_poincare = project(self.scale * x_embedding)
+        else:
+            x_poincare = x_embedding
 
         x_poincare_reshape = x_poincare.contiguous().view(-1, self.embedding)
         targets_reshape = targets.view(-1, 1)[:, 0]
@@ -191,7 +201,11 @@ class SimilarityHypHC(pl.LightningModule):
             decode_vector = torch.stack(batch_class_vector)
 
         x_embedding = self.model(points, decode_vector)
-        x_poincare = project(self.scale * x_embedding)
+
+        if self.normalise:
+            x_poincare = project(self.scale*x_embedding)
+        else:
+            x_poincare = x_embedding
 
         x_poincare_reshape = x_poincare.contiguous().view(-1, self.embedding)
         targets_reshape = targets.view(-1, 1)[:, 0]

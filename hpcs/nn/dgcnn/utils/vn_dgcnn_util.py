@@ -19,7 +19,8 @@ def get_graph_feature(x, k=20, idx=None, x_coord=None):
             idx = knn(x, k=k)
         else:  # fixed knn graph with input point coordinates
             idx = knn(x_coord, k=k)
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+    device = idx.device
 
     idx_base = torch.arange(0, batch_size, device=device).view(-1, 1, 1) * num_points
 

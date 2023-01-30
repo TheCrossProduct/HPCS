@@ -16,11 +16,6 @@ class VN_DGCNN_hmodel(nn.Module):
         self.pooling = pooling
         self.num_class = num_class
 
-        self.manifold = PoincareBall(c=1, dim=2299)
-        self.manifold1 = PoincareBall(c=1, dim=1024)
-        self.manifold2 = PoincareBall(c=1, dim=512)
-        self.manifold3 = PoincareBall(c=1, dim=256)
-
         self.bn7 = nn.BatchNorm1d(64)
         self.bn8 = nn.BatchNorm1d(256)
         self.bn9 = nn.BatchNorm1d(256)
