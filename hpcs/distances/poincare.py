@@ -173,7 +173,7 @@ class HyperbolicDistance(BaseDistance):
 
         dxy = 1 + 2 * (xy / xxyy)
 
-        return torch.acosh(dxy)
+        return torch.exp(-torch.acosh(dxy))
 
     def pairwise_distance(self, query_emb, ref_emb):
         x = project(query_emb)
@@ -184,7 +184,7 @@ class HyperbolicDistance(BaseDistance):
 
         dxy = 1 + 2 * (xy / (xx*yy))
 
-        return torch.acosh(dxy)
+        return torch.exp(-torch.acosh(dxy))
 
 
 class HyperbolicLCA(BaseDistance):
