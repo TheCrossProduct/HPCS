@@ -66,7 +66,7 @@ class SimilarityHypHC(pl.LightningModule):
     def __init__(self, nn: torch.nn.Module, model_name: str = 'vn_dgcnn_partseg', train_rotation: str = 'so3', test_rotation: str = 'so3',
                  dataset: str = 'shapenet', lr: float = 1e-3, embedding: int = 6, k: int = 10, margin: float = 1.0, t_per_anchor: int = 50,
                  fraction: float = 1.2, temperature: float = 0.05, anneal_factor: float = 0.5, anneal_step: int = 0, num_class: int = 4,
-                 normalize: bool = False):
+                 normalize: bool = False, class_vector: bool = False):
         super(SimilarityHypHC, self).__init__()
         self.save_hyperparameters()
         self.model = nn
@@ -85,6 +85,7 @@ class SimilarityHypHC(pl.LightningModule):
         self.anneal_step = anneal_step
         self.num_class = num_class
         self.normalize = normalize
+        self.class_vector = class_vector
         if self.normalize:
             self.scale = torch.nn.Parameter(torch.Tensor([1e-3]), requires_grad=True)
         else:
@@ -136,26 +137,31 @@ class SimilarityHypHC(pl.LightningModule):
         points, label, targets = points.float().to(device), label.long().to(device), targets.long().to(device)
         points = points.transpose(2, 1)
 
-        if self.dataset == 'shapenet':
-            num_parts = self.num_class
-            batch_class_vector = []
-            for object in targets:
-                parts = F.one_hot(remap_labels(torch.unique(object)), num_parts)
-                class_vector = parts.sum(dim=0).float()
-                batch_class_vector.append(class_vector)
-            decode_vector = torch.stack(batch_class_vector)
-        elif self.dataset == 'partnet':
-            num_parts = self.num_class
-            batch_class_vector = []
-            for object in targets:
-                parts = F.one_hot(torch.unique(object), num_parts)
-                class_vector = parts.sum(dim=0).float()
-                batch_class_vector.append(class_vector)
-            decode_vector = torch.stack(batch_class_vector)
+        if self.class_vector:
+            if self.dataset == 'shapenet':
+                num_parts = self.num_class
+                batch_class_vector = []
+                for object in targets:
+                    parts = F.one_hot(remap_labels(torch.unique(object)), num_parts)
+                    class_vector = parts.sum(dim=0).float()
+                    batch_class_vector.append(class_vector)
+                decode_vector = torch.stack(batch_class_vector)
+            elif self.dataset == 'partnet':
+                num_parts = self.num_class
+                batch_class_vector = []
+                for object in targets:
+                    parts = F.one_hot(torch.unique(object), num_parts)
+                    class_vector = parts.sum(dim=0).float()
+                    batch_class_vector.append(class_vector)
+                decode_vector = torch.stack(batch_class_vector)
+        else:
+            num_categories = 16
+            decode_vector = to_categorical(label, num_categories)
+
 
         x_embedding = self.model(points, decode_vector)
-
-        x_poincare = self.scale * x_embedding
+        scale = self.scale.to(x_embedding.device)
+        x_poincare = project(scale * x_embedding)
 
         x_poincare_reshape = x_poincare.contiguous().view(-1, self.embedding)
         targets_reshape = targets.view(-1, 1)[:, 0]

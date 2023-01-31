@@ -48,6 +48,7 @@ def configure():
     parser.add_argument('--anneal_step', '-anneal_step', default=0, type=int, help='use annealing each n step')
     parser.add_argument('--patience', '-patience', default=50, type=int, help='patience value for early stopping')
     parser.add_argument('--normalize', '-normalize', default=True, type=bool, help='normalize hyperbolic space')
+    parser.add_argument('--class_vector', '-class_vector', default=False, type=bool, help='class vector to decode')
     parser.add_argument('--pretrained', '-pretrained', default=False, type=bool, help='load pretrained model')
     parser.add_argument('--resume', '-resume', default=False, type=bool, help='resume training on model')
     args = parser.parse_args()
@@ -76,6 +77,7 @@ def configure():
     anneal_step = args.anneal_step
     patience = args.patience
     normalize = args.normalize
+    class_vector = args.class_vector
     pretrained = args.pretrained
     resume = args.resume
 
@@ -90,7 +92,10 @@ def configure():
         valid_loader = DataLoader(valid_dataset, batch_size=batch, shuffle=False, num_workers=num_workers, drop_last=True)
         test_loader = DataLoader(test_dataset, batch_size=batch, shuffle=False, num_workers=num_workers, drop_last=True)
 
-        num_class = len(train_dataset.seg_classes[category])
+        if class_vector:
+            num_class = len(train_dataset.seg_classes[category])
+        else:
+            num_class = 16
 
     elif dataset == 'partnet':
         data_folder = 'data/PartNet/sem_seg_h5/'
@@ -101,6 +106,9 @@ def configure():
         with open('data/PartNet/after_merging_label_ids/%s-level-%d.txt' % (category, level), 'r') as fin:
             num_class = len(fin.readlines()) + 1
             print('Number of Classes: %d' % num_class)
+
+        if not class_vector:
+            num_class = 16
 
         train_dataset = H5Dataset(list_train, fixed_points)
         val_dataset = H5Dataset(list_val, fixed_points)
@@ -149,7 +157,8 @@ def configure():
                             anneal_factor=anneal_factor,
                             anneal_step=anneal_step,
                             num_class=num_class,
-                            normalize=normalize
+                            normalize=normalize,
+                            class_vector=class_vector
                             )
 
 

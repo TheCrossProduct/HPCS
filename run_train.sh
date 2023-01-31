@@ -3,14 +3,14 @@ python train.py \
   -category 'Airplane' \
   -level 1 \
   -fixed_points 1024 \
-  -model 'vn_dgcnn_partseg' \
+  -model 'vn_dgcnn_expo' \
   -embedding 6 \
   -k 20 \
   -margin 0.05 \
   -t_per_anchor 50 \
   -fraction 1.2 \
   -temperature 1 \
-  -epochs 15 \
+  -epochs 25 \
   -batch 6 \
-  -lr 0.001 \
+  -lr 0.005 \
   -accelerator 'gpu'
