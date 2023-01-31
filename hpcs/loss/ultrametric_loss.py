@@ -12,7 +12,7 @@ from hpcs.distances.lca import hyp_lca
 
 class TripletHyperbolicLoss(BaseMetricLossFunction):
     def __init__(self, margin: float = 1.0, t_per_anchor: int = 50, fraction: float = 1.2, scale: float = 1e-3,
-                 temperature: float = 0.05, anneal_factor: float = 0.5, normalise: bool = False):
+                 temperature: float = 0.05, anneal_factor: float = 0.5, normalize: bool = False):
         super(TripletHyperbolicLoss, self).__init__()
         self.margin = margin
         self.t_per_anchor = t_per_anchor
@@ -20,7 +20,7 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
         self.scale = scale
         self.temperature = temperature
         self.anneal_factor = anneal_factor
-        self.normalise = normalise
+        self.normalize = normalize
 
         self.distance_sim = CosineSimilarity()
 
@@ -58,7 +58,7 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
         e2 = embeddings[positive_idx]
         e3 = embeddings[negative_idx]
 
-        if self.normalise:
+        if self.normalize:
             e1 = self.normalize_embeddings(e1)
             e2 = self.normalize_embeddings(e2)
             e3 = self.normalize_embeddings(e3)

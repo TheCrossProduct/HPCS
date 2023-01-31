@@ -66,7 +66,7 @@ class SimilarityHypHC(pl.LightningModule):
     def __init__(self, nn: torch.nn.Module, model_name: str = 'vn_dgcnn_partseg', train_rotation: str = 'so3', test_rotation: str = 'so3',
                  dataset: str = 'shapenet', lr: float = 1e-3, embedding: int = 6, k: int = 10, margin: float = 1.0, t_per_anchor: int = 50,
                  fraction: float = 1.2, temperature: float = 0.05, anneal_factor: float = 0.5, anneal_step: int = 0, num_class: int = 4,
-                 normalise: bool = False):
+                 normalize: bool = False):
         super(SimilarityHypHC, self).__init__()
         self.save_hyperparameters()
         self.model = nn
@@ -84,11 +84,11 @@ class SimilarityHypHC(pl.LightningModule):
         self.anneal_factor = anneal_factor
         self.anneal_step = anneal_step
         self.num_class = num_class
-        self.normalise = normalise
-        if self.normalise:
+        self.normalize = normalize
+        if self.normalize:
             self.scale = torch.nn.Parameter(torch.Tensor([1e-3]), requires_grad=True)
         else:
-            self.scale = torch.Tensor([1.0])
+            self.scale = torch.Tensor([0.99])
 
         self.triplet_loss = TripletHyperbolicLoss(margin=self.margin,
                                                   t_per_anchor=self.t_per_anchor,
@@ -96,19 +96,18 @@ class SimilarityHypHC(pl.LightningModule):
                                                   scale=self.scale,
                                                   temperature=self.temperature,
                                                   anneal_factor=self.anneal_factor,
-                                                  normalise=self.normalise)
+                                                  normalize=self.normalize)
 
     def _decode_linkage(self, leaves_embeddings):
         """Build linkage matrix from leaves' embeddings. Assume points are normalized to same radius."""
-        if self.normalise:
+        if self.normalize:
             leaves_embeddings = self.triplet_loss.normalize_embeddings(leaves_embeddings)
-
         leaves_embeddings = project(leaves_embeddings).detach().cpu()
         Z = linkage(leaves_embeddings, method='ward', metric='euclidean')
         return Z
 
 
-    def forward(self, batch):
+    def forward(self, batch, testing):
         if self.dataset == 'shapenet':
             points, label, targets = batch
         elif self.dataset == 'partnet':
@@ -116,13 +115,22 @@ class SimilarityHypHC(pl.LightningModule):
             label = torch.zeros(points.size(0), 1)
 
         trot = None
-        rot = self.train_rotation
-        if rot == 'z':
-            trot = RotateAxisAngle(angle=torch.rand(points.shape[0]) * 360, axis="Z", degrees=True)
-        elif rot == 'so3':
-            trot = Rotate(R=random_rotations(points.shape[0]))
-        if trot is not None:
-            points = trot.transform_points(points.cpu())
+        if testing:
+            rot = self.test_rotation
+            if rot == 'z':
+                trot = RotateAxisAngle(angle=torch.rand(points.shape[0]) * 360, axis="Z", degrees=True)
+            elif rot == 'so3':
+                trot = Rotate(R=random_rotations(points.shape[0]))
+            if trot is not None:
+                points = trot.transform_points(points.cpu())
+        else:
+            rot = self.train_rotation
+            if rot == 'z':
+                trot = RotateAxisAngle(angle=torch.rand(points.shape[0]) * 360, axis="Z", degrees=True)
+            elif rot == 'so3':
+                trot = Rotate(R=random_rotations(points.shape[0]))
+            if trot is not None:
+                points = trot.transform_points(points.cpu())
 
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         points, label, targets = points.float().to(device), label.long().to(device), targets.long().to(device)
@@ -147,7 +155,7 @@ class SimilarityHypHC(pl.LightningModule):
 
         x_embedding = self.model(points, decode_vector)
 
-        if self.normalise:
+        if self.normalize:
             x_poincare = project(self.scale * x_embedding)
         else:
             x_poincare = project(0.99 * x_embedding)
@@ -162,69 +170,14 @@ class SimilarityHypHC(pl.LightningModule):
         loss_triplet = losses['loss_sim']['losses']
         loss_hyphc = losses['loss_lca']['losses']
 
-        return loss_triplet, loss_hyphc
-
-
-    def _forward(self, batch):
-        if self.dataset == 'shapenet':
-            points, label, targets = batch
-        elif self.dataset == 'partnet':
-            points, targets = batch
-            label = torch.zeros(points.size(0), 1)
-
-        trot = None
-        rot = self.test_rotation
-        if rot == 'z':
-            trot = RotateAxisAngle(angle=torch.rand(points.shape[0]) * 360, axis="Z", degrees=True)
-        elif rot == 'so3':
-            trot = Rotate(R=random_rotations(points.shape[0]))
-        if trot is not None:
-            points = trot.transform_points(points.cpu())
-
-        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        points, label, targets = points.float().to(device), label.long().to(device), targets.long().to(device)
-        points = points.transpose(2, 1)
-
-        if self.dataset == 'shapenet':
-            num_parts = self.num_class
-            batch_class_vector = []
-            for object in targets:
-                parts = F.one_hot(remap_labels(torch.unique(object)), num_parts)
-                class_vector = parts.sum(dim=0).float()
-                batch_class_vector.append(class_vector)
-            decode_vector = torch.stack(batch_class_vector)
-        elif self.dataset == 'partnet':
-            num_parts = self.num_class
-            batch_class_vector = []
-            for object in targets:
-                parts = F.one_hot(torch.unique(object), num_parts)
-                class_vector = parts.sum(dim=0).float()
-                batch_class_vector.append(class_vector)
-            decode_vector = torch.stack(batch_class_vector)
-
-        x_embedding = self.model(points, decode_vector)
-
-        if self.normalise:
-            x_poincare = project(self.scale*x_embedding)
+        if testing:
+            linkage_matrix = []
+            for object_idx in range(points.size(0)):
+                Z = self._decode_linkage(x_poincare[object_idx])
+                linkage_matrix.append(Z)
+            return loss_triplet, loss_hyphc, x_embedding, x_poincare, linkage_matrix, points, targets
         else:
-            x_poincare = project(0.99 * x_embedding)
-
-        x_poincare_reshape = x_poincare.contiguous().view(-1, self.embedding)
-        targets_reshape = targets.view(-1, 1)[:, 0]
-
-        losses = self.triplet_loss.compute_loss(embeddings=x_poincare_reshape,
-                                                labels=targets_reshape,
-                                                )
-
-        loss_triplet = losses['loss_sim']['losses']
-        loss_hyphc = losses['loss_lca']['losses']
-
-        linkage_matrix = []
-        for object_idx in range(points.size(0)):
-            Z = self._decode_linkage(x_poincare[object_idx])
-            linkage_matrix.append(Z)
-
-        return loss_triplet, loss_hyphc, x_embedding, x_poincare, linkage_matrix, points, targets
+            return loss_triplet, loss_hyphc
 
 
     def configure_optimizers(self):
@@ -243,7 +196,7 @@ class SimilarityHypHC(pl.LightningModule):
         return [optim], scheduler
 
     def training_step(self, batch, batch_idx):
-        loss_triplet, loss_hyphc = self.forward(batch)
+        loss_triplet, loss_hyphc = self.forward(batch, testing=False)
         loss = loss_triplet + loss_hyphc
 
         self.log("train_loss", {"total_loss": loss, "triplet_loss": loss_triplet, "hyphc_loss": loss_hyphc})
@@ -258,21 +211,21 @@ class SimilarityHypHC(pl.LightningModule):
             print("Temperature Value: ", self.temperature)
 
     def validation_step(self, batch, batch_idx):
-        val_loss_triplet, val_loss_hyphc = self.forward(batch)
+        val_loss_triplet, val_loss_hyphc = self.forward(batch, testing=False)
         val_loss = val_loss_triplet + val_loss_hyphc
 
         self.log("val_loss", val_loss)
         return {'val_loss': val_loss}
 
     def test_step(self, batch, batch_idx):
-        test_loss_triplet, test_loss_hyphc, x_embedding, x_poincare, linkage_matrix, points, targets = self._forward(batch)
+        test_loss_triplet, test_loss_hyphc, x_embedding, x_poincare, linkage_matrix, points, targets = self.forward(batch, testing=True)
         test_loss = test_loss_hyphc + test_loss_triplet
 
         indexes = []
         for object_idx in range(points.size(0)):
             best_pred, best_k, best_score = get_optimal_k(targets[object_idx].cpu(), linkage_matrix[object_idx], 'iou')
             # iou_score, ri_score = eval_clustering(targets[object_idx].cpu(), linkage_matrix[object_idx])
-            emb_poincare = self.triplet_loss.normalize_embeddings(x_poincare[object_idx]) if self.normalise else x_poincare[object_idx]
+            emb_poincare = self.triplet_loss.normalize_embeddings(x_poincare[object_idx]) if self.normalize else x_poincare[object_idx]
             plot_hyperbolic_eval(x=points[object_idx].T.cpu(),
                                  y=targets[object_idx].cpu(),
                                  y_pred=best_pred,

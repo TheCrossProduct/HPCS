@@ -17,6 +17,7 @@ from hpcs.hyp_hc import SimilarityHypHC
 from hpcs.nn.dgcnn import DGCNN_partseg
 from hpcs.nn.dgcnn import VN_DGCNN_partseg
 from hpcs.nn.dgcnn import VN_DGCNN_hmodel
+from hpcs.nn.dgcnn import VN_DGCNN_expo
 from hpcs.nn.pointnet import POINTNET_partseg
 from hpcs.nn.pointnet import VN_POINTNET_partseg
 
@@ -46,6 +47,7 @@ def configure():
     parser.add_argument('--anneal_factor', '-anneal_factor', default=2, type=float, help='annealing factor')
     parser.add_argument('--anneal_step', '-anneal_step', default=0, type=int, help='use annealing each n step')
     parser.add_argument('--patience', '-patience', default=50, type=int, help='patience value for early stopping')
+    parser.add_argument('--normalize', '-normalize', default=False, type=bool, help='normalize hyperbolic space')
     parser.add_argument('--pretrained', '-pretrained', default=False, type=bool, help='load pretrained model')
     parser.add_argument('--resume', '-resume', default=False, type=bool, help='resume training on model')
     args = parser.parse_args()
@@ -73,6 +75,7 @@ def configure():
     anneal_factor = args.anneal_factor
     anneal_step = args.anneal_step
     patience = args.patience
+    normalize = args.normalize
     pretrained = args.pretrained
     resume = args.resume
 
@@ -114,6 +117,8 @@ def configure():
         nn = VN_DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean', num_class=num_class)
     elif model_name == 'vn_dgcnn_hmodel':
         nn = VN_DGCNN_hmodel(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean', num_class=num_class)
+    elif model_name == 'vn_dgcnn_expo':
+        nn = VN_DGCNN_expo(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean', num_class=num_class)
     elif model_name == 'pointnet_partseg':
         nn = POINTNET_partseg(num_part=out_features, normal_channel=False)
     elif model_name == 'vn_pointnet_partseg':
@@ -143,7 +148,8 @@ def configure():
                             temperature=temperature,
                             anneal_factor=anneal_factor,
                             anneal_step=anneal_step,
-                            num_class=num_class
+                            num_class=num_class,
+                            normalize=normalize
                             )
 
 
