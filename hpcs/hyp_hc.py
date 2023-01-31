@@ -100,7 +100,9 @@ class SimilarityHypHC(pl.LightningModule):
 
     def _decode_linkage(self, leaves_embeddings):
         """Build linkage matrix from leaves' embeddings. Assume points are normalized to same radius."""
-        leaves_embeddings = self.triplet_loss.normalize_embeddings(leaves_embeddings)
+        if self.normalise:
+            leaves_embeddings = self.triplet_loss.normalize_embeddings(leaves_embeddings)
+
         leaves_embeddings = project(leaves_embeddings).detach().cpu()
         Z = linkage(leaves_embeddings, method='ward', metric='euclidean')
         return Z
@@ -148,7 +150,7 @@ class SimilarityHypHC(pl.LightningModule):
         if self.normalise:
             x_poincare = project(self.scale * x_embedding)
         else:
-            x_poincare = x_embedding
+            x_poincare = project(0.99 * x_embedding)
 
         x_poincare_reshape = x_poincare.contiguous().view(-1, self.embedding)
         targets_reshape = targets.view(-1, 1)[:, 0]
@@ -205,7 +207,7 @@ class SimilarityHypHC(pl.LightningModule):
         if self.normalise:
             x_poincare = project(self.scale*x_embedding)
         else:
-            x_poincare = x_embedding
+            x_poincare = project(0.99 * x_embedding)
 
         x_poincare_reshape = x_poincare.contiguous().view(-1, self.embedding)
         targets_reshape = targets.view(-1, 1)[:, 0]
@@ -270,12 +272,12 @@ class SimilarityHypHC(pl.LightningModule):
         for object_idx in range(points.size(0)):
             best_pred, best_k, best_score = get_optimal_k(targets[object_idx].cpu(), linkage_matrix[object_idx], 'iou')
             # iou_score, ri_score = eval_clustering(targets[object_idx].cpu(), linkage_matrix[object_idx])
-
+            emb_poincare = self.triplet_loss.normalize_embeddings(x_poincare[object_idx]) if self.normalise else x_poincare[object_idx]
             plot_hyperbolic_eval(x=points[object_idx].T.cpu(),
                                  y=targets[object_idx].cpu(),
                                  y_pred=best_pred,
                                  emb_hidden=x_embedding[object_idx].cpu(),
-                                 emb_poincare=self.triplet_loss.normalize_embeddings(x_poincare[object_idx]).cpu(),
+                                 emb_poincare=emb_poincare.cpu(),
                                  linkage_matrix=linkage_matrix[object_idx],
                                  k=best_k,
                                  score=best_score,
