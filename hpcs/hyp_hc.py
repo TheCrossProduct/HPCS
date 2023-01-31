@@ -155,10 +155,7 @@ class SimilarityHypHC(pl.LightningModule):
 
         x_embedding = self.model(points, decode_vector)
 
-        if self.normalize:
-            x_poincare = project(self.scale * x_embedding)
-        else:
-            x_poincare = project(0.99 * x_embedding)
+        x_poincare = self.scale * x_embedding
 
         x_poincare_reshape = x_poincare.contiguous().view(-1, self.embedding)
         targets_reshape = targets.view(-1, 1)[:, 0]

@@ -8,6 +8,7 @@ from hpcs.miner.triplet_margin_miner import RandomTripletMarginMiner
 from hpcs.miner.triplet_margin_loss import TripletMarginLoss
 
 from hpcs.distances.lca import hyp_lca
+from hpcs.distances.poincare import HyperbolicDistance
 
 
 class TripletHyperbolicLoss(BaseMetricLossFunction):
@@ -22,7 +23,7 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
         self.anneal_factor = anneal_factor
         self.normalize = normalize
 
-        self.distance_sim = CosineSimilarity()
+        self.distance_sim = HyperbolicDistance()
 
         self.hyp_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=0, t_per_anchor=self.t_per_anchor, fraction=self.fraction, type_of_triplets='easy')
         self.triplet_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=self.margin, t_per_anchor=self.t_per_anchor, fraction=self.fraction, type_of_triplets='all')

@@ -15,7 +15,7 @@ class VN_DGCNN_expo(nn.Module):
         self.pooling = pooling
         self.num_class = num_class
 
-        self.manifold = PoincareBall(c=1, dim=2)
+        self.manifold = PoincareBall(c=1, dim=self.out_features)
 
         self.bn7 = nn.BatchNorm1d(64)
         self.bn8 = nn.BatchNorm1d(256)

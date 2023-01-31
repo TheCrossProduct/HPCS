@@ -3,11 +3,11 @@ python train.py \
   -category 'Airplane' \
   -level 1 \
   -fixed_points 1024 \
-  -model 'vn_dgcnn_hmodel' \
-  -embedding 2 \
+  -model 'vn_dgcnn_partseg' \
+  -embedding 6 \
   -k 20 \
   -margin 0.05 \
-  -t_per_anchor 100 \
+  -t_per_anchor 50 \
   -fraction 1.2 \
   -temperature 1 \
   -epochs 15 \

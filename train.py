@@ -47,7 +47,7 @@ def configure():
     parser.add_argument('--anneal_factor', '-anneal_factor', default=2, type=float, help='annealing factor')
     parser.add_argument('--anneal_step', '-anneal_step', default=0, type=int, help='use annealing each n step')
     parser.add_argument('--patience', '-patience', default=50, type=int, help='patience value for early stopping')
-    parser.add_argument('--normalize', '-normalize', default=False, type=bool, help='normalize hyperbolic space')
+    parser.add_argument('--normalize', '-normalize', default=True, type=bool, help='normalize hyperbolic space')
     parser.add_argument('--pretrained', '-pretrained', default=False, type=bool, help='load pretrained model')
     parser.add_argument('--resume', '-resume', default=False, type=bool, help='resume training on model')
     args = parser.parse_args()
