@@ -9,6 +9,7 @@ from hpcs.miner.triplet_margin_loss import TripletMarginLoss
 
 from hpcs.distances.lca import hyp_lca
 from hpcs.distances.poincare import HyperbolicDistance
+from pytorch_metric_learning.utils import loss_and_miner_utils as lmu
 
 
 class TripletHyperbolicLoss(BaseMetricLossFunction):
@@ -47,11 +48,9 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
     def compute_loss(self, embeddings, labels):
         triplet_indices_tuple = self.triplet_miner(embeddings, labels)
         hyp_indices_tuple = self.hyp_miner(embeddings, labels)
-
         anchor_idx, positive_idx, negative_idx = hyp_indices_tuple
 
         mat_sim = 0.5 * (1 + self.distance_sim(embeddings))
-        print(mat_sim)
 
         wij = mat_sim[anchor_idx, positive_idx]
         wik = mat_sim[anchor_idx, negative_idx]
