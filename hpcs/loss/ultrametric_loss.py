@@ -24,6 +24,7 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
         self.normalize = normalize
 
         self.distance_sim = CosineSimilarity()
+        # self.distance_sim = HyperbolicDistance()
 
         self.hyp_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=0, t_per_anchor=self.t_per_anchor, fraction=self.fraction, type_of_triplets='easy')
         self.triplet_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=self.margin, t_per_anchor=self.t_per_anchor, fraction=self.fraction, type_of_triplets='all')
@@ -50,6 +51,7 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
         anchor_idx, positive_idx, negative_idx = hyp_indices_tuple
 
         mat_sim = 0.5 * (1 + self.distance_sim(embeddings))
+        print(mat_sim)
 
         wij = mat_sim[anchor_idx, positive_idx]
         wik = mat_sim[anchor_idx, negative_idx]

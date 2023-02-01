@@ -115,23 +115,18 @@ class SimilarityHypHC(pl.LightningModule):
             points, targets = batch
             label = torch.zeros(points.size(0), 1)
 
-        trot = None
         if testing:
             rot = self.test_rotation
-            if rot == 'z':
-                trot = RotateAxisAngle(angle=torch.rand(points.shape[0]) * 360, axis="Z", degrees=True)
-            elif rot == 'so3':
-                trot = Rotate(R=random_rotations(points.shape[0]))
-            if trot is not None:
-                points = trot.transform_points(points.cpu())
         else:
             rot = self.train_rotation
-            if rot == 'z':
-                trot = RotateAxisAngle(angle=torch.rand(points.shape[0]) * 360, axis="Z", degrees=True)
-            elif rot == 'so3':
-                trot = Rotate(R=random_rotations(points.shape[0]))
-            if trot is not None:
-                points = trot.transform_points(points.cpu())
+
+        trot = None
+        if rot == 'z':
+            trot = RotateAxisAngle(angle=torch.rand(points.shape[0]) * 360, axis="Z", degrees=True)
+        elif rot == 'so3':
+            trot = Rotate(R=random_rotations(points.shape[0]))
+        if trot is not None:
+            points = trot.transform_points(points.cpu())
 
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         points, label, targets = points.float().to(device), label.long().to(device), targets.long().to(device)
@@ -161,7 +156,7 @@ class SimilarityHypHC(pl.LightningModule):
 
         x_embedding = self.model(points, decode_vector)
         scale = self.scale.to(x_embedding.device)
-        x_poincare = project(scale * x_embedding)
+        x_poincare = scale * x_embedding
 
         x_poincare_reshape = x_poincare.contiguous().view(-1, self.embedding)
         targets_reshape = targets.view(-1, 1)[:, 0]

@@ -3,6 +3,7 @@ import torch.utils.data
 from hpcs.nn.dgcnn.utils.vn_layers import *
 from hpcs.nn.dgcnn.utils.vn_dgcnn_util import get_graph_feature
 from hpcs.nn.dgcnn.utils.poincareball import PoincareBall
+from hpcs.nn.dgcnn.utils.manifold_layers import MobiusLayer
 
 
 class VN_DGCNN_expo(nn.Module):
