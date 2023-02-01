@@ -66,7 +66,7 @@ class SimilarityHypHC(pl.LightningModule):
     def __init__(self, nn: torch.nn.Module, model_name: str = 'vn_dgcnn_partseg', train_rotation: str = 'so3', test_rotation: str = 'so3',
                  dataset: str = 'shapenet', lr: float = 1e-3, embedding: int = 6, k: int = 10, margin: float = 1.0, t_per_anchor: int = 50,
                  fraction: float = 1.2, temperature: float = 0.05, anneal_factor: float = 0.5, anneal_step: int = 0, num_class: int = 4,
-                 normalize: bool = False, class_vector: bool = False):
+                 normalize: bool = False, trade_off: float = 0.1, class_vector: bool = False):
         super(SimilarityHypHC, self).__init__()
         self.save_hyperparameters()
         self.model = nn
@@ -86,6 +86,8 @@ class SimilarityHypHC(pl.LightningModule):
         self.num_class = num_class
         self.normalize = normalize
         self.class_vector = class_vector
+        self.trade_off = trade_off
+
         if self.normalize:
             self.scale = torch.nn.Parameter(torch.Tensor([1e-3]), requires_grad=True)
         else:
@@ -195,9 +197,9 @@ class SimilarityHypHC(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         loss_triplet, loss_hyphc = self.forward(batch, testing=False)
-        loss = loss_triplet + loss_hyphc
+        loss = loss_triplet + (loss_hyphc * self.trade_off)
 
-        self.log("train_loss", {"total_loss": loss, "triplet_loss": loss_triplet, "hyphc_loss": loss_hyphc})
+        self.log("train_loss", {"total_loss": loss, "triplet_loss": loss_triplet, "hyphc_loss": loss_hyphc * self.trade_off})
         self.log("scale", self.scale)
         self.log("temperature", self.temperature)
         return {'loss': loss, 'progress_bar': {'triplet': loss_triplet, 'hyphc': loss_hyphc}}
@@ -210,14 +212,14 @@ class SimilarityHypHC(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         val_loss_triplet, val_loss_hyphc = self.forward(batch, testing=False)
-        val_loss = val_loss_triplet + val_loss_hyphc
+        val_loss = val_loss_triplet + (val_loss_hyphc * self.trade_off)
 
-        self.log("val_loss", val_loss)
+        self.log("val_loss", {"val_total_loss": val_loss, "val_triplet_loss": val_loss_triplet, "val_hyphc_loss": val_loss_hyphc * self.trade_off})
         return {'val_loss': val_loss}
 
     def test_step(self, batch, batch_idx):
         test_loss_triplet, test_loss_hyphc, x_embedding, x_poincare, linkage_matrix, points, targets = self.forward(batch, testing=True)
-        test_loss = test_loss_hyphc + test_loss_triplet
+        test_loss = test_loss_hyphc + (test_loss_triplet * self.trade_off)
 
         indexes = []
         for object_idx in range(points.size(0)):
@@ -239,4 +241,5 @@ class SimilarityHypHC(pl.LightningModule):
 
         self.log("score", score)
         self.log("test_loss", test_loss)
+        self.log("test_loss", {"test_total_loss": test_loss, "test_triplet_loss": test_loss_triplet, "test_hyphc_loss": test_loss_hyphc * self.trade_off})
         return {'test_loss': test_loss}
