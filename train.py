@@ -48,6 +48,7 @@ def configure():
     parser.add_argument('--patience', '-patience', default=50, type=int, help='patience value for early stopping')
     parser.add_argument('--normalize', '-normalize', default=True, type=bool, help='normalize hyperbolic space')
     parser.add_argument('--class_vector', '-class_vector', default=False, type=bool, help='class vector to decode')
+    parser.add_argument('--trade_off', '-trade_off', default=0.5, type=float, help='control trade-off between two losses')
     parser.add_argument('--pretrained', '-pretrained', default=False, type=bool, help='load pretrained model')
     parser.add_argument('--resume', '-resume', default=False, type=bool, help='resume training on model')
     args = parser.parse_args()
@@ -77,6 +78,7 @@ def configure():
     patience = args.patience
     normalize = args.normalize
     class_vector = args.class_vector
+    trade_off = args.trade_off
     pretrained = args.pretrained
     resume = args.resume
 
@@ -155,7 +157,8 @@ def configure():
                             anneal_step=anneal_step,
                             num_class=num_class,
                             normalize=normalize,
-                            class_vector=class_vector
+                            class_vector=class_vector,
+                            trade_off=trade_off
                             )
 
 

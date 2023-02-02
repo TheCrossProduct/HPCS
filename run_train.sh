@@ -4,7 +4,7 @@ python train.py \
   -level 1 \
   -fixed_points 256 \
   -model 'vn_dgcnn_expo' \
-  -embedding 4 \
+  -embedding 6 \
   -k 20 \
   -margin 0.05 \
   -t_per_anchor 50 \
