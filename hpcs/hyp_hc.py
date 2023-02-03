@@ -10,6 +10,7 @@ from pytorch3d.transforms import RotateAxisAngle, Rotate, random_rotations
 
 from hpcs.optim import RAdam
 from hpcs.distances.poincare import project
+from hpcs.distances.poincare import mobius_add
 from hpcs.loss.ultrametric_loss import TripletHyperbolicLoss
 from hpcs.utils.viz import plot_hyperbolic_eval
 from hpcs.utils.scores import get_optimal_k
@@ -27,6 +28,13 @@ def remap_labels(y_true):
     for i, l in enumerate(torch.unique(y_true)):
         y_remap[y_true==l] = i
     return y_remap
+
+def expmap(p: torch.Tensor, v: torch.Tensor, r: torch.Tensor):
+    v_norm, p_norm = torch.norm(v), torch.norm(p)
+    second_term = torch.tanh((r * v_norm) / (r**2 - p_norm**2)) * (r * v / v_norm)
+    p = p.to(second_term.device)
+    y = mobius_add(p, second_term)
+    return y
 
 
 class SimilarityHypHC(pl.LightningModule):
@@ -66,7 +74,7 @@ class SimilarityHypHC(pl.LightningModule):
     def __init__(self, nn: torch.nn.Module, model_name: str = 'vn_dgcnn_partseg', train_rotation: str = 'so3', test_rotation: str = 'so3',
                  dataset: str = 'shapenet', lr: float = 1e-3, embedding: int = 6, k: int = 10, margin: float = 1.0, t_per_anchor: int = 50,
                  fraction: float = 1.2, temperature: float = 0.05, anneal_factor: float = 0.5, anneal_step: int = 0, num_class: int = 4,
-                 normalize: bool = False, class_vector: bool = False, trade_off: float = 0.1):
+                 normalize: bool = False, class_vector: bool = False, trade_off: float = 0.1, hierarchical: bool = False):
         super(SimilarityHypHC, self).__init__()
         self.save_hyperparameters()
         self.model = nn
@@ -87,9 +95,10 @@ class SimilarityHypHC(pl.LightningModule):
         self.normalize = normalize
         self.class_vector = class_vector
         self.trade_off = trade_off
+        self.hierarchical = hierarchical
 
         if self.normalize:
-            self.scale = torch.nn.Parameter(torch.Tensor([1e-3]), requires_grad=True)
+            self.scale = torch.Tensor([0.99])
         else:
             self.scale = torch.Tensor([0.99])
 
@@ -131,26 +140,17 @@ class SimilarityHypHC(pl.LightningModule):
             points = trot.transform_points(points.cpu())
 
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        points, label, targets = points.float().to(device), label.long().to(device), targets.long().to(device)
+        points, label, targets = points.float().to(device), label.long().to(device), targets
         points = points.transpose(2, 1)
 
         if self.class_vector:
-            if self.dataset == 'shapenet':
-                num_parts = self.num_class
-                batch_class_vector = []
-                for object in targets:
-                    parts = F.one_hot(remap_labels(torch.unique(object)), num_parts)
-                    class_vector = parts.sum(dim=0).float()
-                    batch_class_vector.append(class_vector)
-                decode_vector = torch.stack(batch_class_vector)
-            elif self.dataset == 'partnet':
-                num_parts = self.num_class
-                batch_class_vector = []
-                for object in targets:
-                    parts = F.one_hot(torch.unique(object), num_parts)
-                    class_vector = parts.sum(dim=0).float()
-                    batch_class_vector.append(class_vector)
-                decode_vector = torch.stack(batch_class_vector)
+            num_parts = self.num_class
+            batch_class_vector = []
+            for object in targets:
+                parts = F.one_hot(torch.unique(object), num_parts)
+                class_vector = parts.sum(dim=0).float()
+                batch_class_vector.append(class_vector)
+            decode_vector = torch.stack(batch_class_vector)
         else:
             num_categories = 16
             decode_vector = to_categorical(label, num_categories)
@@ -158,35 +158,55 @@ class SimilarityHypHC(pl.LightningModule):
 
         x_embedding = self.model(points, decode_vector)
         scale = self.scale.to(x_embedding.device)
-        x_poincare = scale * x_embedding
+        x_embedding = expmap(torch.Tensor([0]), x_embedding, scale)
+        x_poincare = x_embedding
 
         x_poincare_reshape = x_poincare.contiguous().view(-1, self.embedding)
-        targets_reshape = targets.view(-1, 1)[:, 0]
 
-        losses = self.triplet_loss.compute_loss(embeddings=x_poincare_reshape,
-                                                labels=targets_reshape,
-                                                )
+        if not self.hierarchical:
+            targets_reshape = targets.view(-1, 1)[:, 0]
 
-        loss_triplet = losses['loss_sim']['losses']
-        loss_hyphc = losses['loss_lca']['losses']
+            losses = self.triplet_loss.compute_loss(embeddings=x_poincare_reshape,
+                                                    labels=targets_reshape,
+                                                    )
 
-        loss_hyphc = loss_hyphc * self.trade_off
+            total_loss_triplet = losses['loss_sim']['losses']
+            total_loss_hyphc = losses['loss_lca']['losses']
+            total_loss_hyphc = total_loss_hyphc * self.trade_off
+        else:
+            loss_triplet_list = []
+            loss_hyphc_list = []
+            for i in range(3):
+                targets_reshape = targets[i].view(-1, 1)[:, 0]
+
+                losses = self.triplet_loss.compute_loss(embeddings=x_poincare_reshape,
+                                                        labels=targets_reshape,
+                                                        )
+
+                loss_triplet = losses['loss_sim']['losses']
+                loss_hyphc = losses['loss_lca']['losses']
+                loss_hyphc = loss_hyphc * self.trade_off
+
+                loss_triplet_list.append(loss_triplet)
+                loss_hyphc_list.append(loss_hyphc)
+            total_loss_triplet = sum(loss_triplet_list)
+            total_loss_hyphc = sum(loss_hyphc_list)
 
         if testing:
             linkage_matrix = []
             for object_idx in range(points.size(0)):
                 Z = self._decode_linkage(x_poincare[object_idx])
                 linkage_matrix.append(Z)
-            return loss_triplet, loss_hyphc, x_embedding, x_poincare, linkage_matrix, points, targets
+            return total_loss_triplet, total_loss_hyphc, x_embedding, x_poincare, linkage_matrix, points, targets
         else:
-            return loss_triplet, loss_hyphc
+            return total_loss_triplet, total_loss_hyphc
 
 
     def configure_optimizers(self):
         optim = RAdam(self.parameters(), lr=self.lr)
         scheduler = [
             {
-                'scheduler': lr_scheduler.ReduceLROnPlateau(optim, mode='min', factor=0.5, patience=5,
+                'scheduler': lr_scheduler.ReduceLROnPlateau(optim, mode='min', factor=0.5, patience=2,
                                                             min_lr=1e-6, verbose=True),
                 'monitor': 'val_loss',
                 'interval': 'epoch',
@@ -204,6 +224,7 @@ class SimilarityHypHC(pl.LightningModule):
         self.log("train_loss", {"total_loss": loss, "triplet_loss": loss_triplet, "hyphc_loss": loss_hyphc})
         self.log("scale", self.scale)
         self.log("temperature", self.temperature)
+        self.log("lr", self.lr)
         return {'loss': loss, 'progress_bar': {'triplet': loss_triplet, 'hyphc': loss_hyphc}}
 
     def training_epoch_end(self, outputs):

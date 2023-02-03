@@ -1,10 +1,10 @@
 python train.py \
-  -dataset 'shapenet' \
-  -category 'Airplane' \
+  -dataset 'partnet' \
+  -category 'Lamp' \
   -level 1 \
   -fixed_points 256 \
   -model 'vn_dgcnn_expo' \
-  -embedding 6 \
+  -embedding 4 \
   -k 20 \
   -margin 0.05 \
   -t_per_anchor 50 \

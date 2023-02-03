@@ -7,6 +7,7 @@ from collections import OrderedDict
 from torch.utils.data import DataLoader
 from data.ShapeNet.ShapeNetDataLoader import PartNormalDataset
 from data.PartNet.PartNetDataLoader import H5Dataset
+from data.PartNet.Hierarchical import H5Dataset_hierarchical
 
 import wandb
 import pytorch_lightning as pl
@@ -49,6 +50,7 @@ def configure():
     parser.add_argument('--normalize', '-normalize', default=True, type=bool, help='normalize hyperbolic space')
     parser.add_argument('--class_vector', '-class_vector', default=False, type=bool, help='class vector to decode')
     parser.add_argument('--trade_off', '-trade_off', default=0.5, type=float, help='control trade-off between two losses')
+    parser.add_argument('--hierarchical', '-hierarchical', default=True, type=bool, help='hierarchical loss')
     parser.add_argument('--pretrained', '-pretrained', default=False, type=bool, help='load pretrained model')
     parser.add_argument('--resume', '-resume', default=False, type=bool, help='resume training on model')
     args = parser.parse_args()
@@ -79,6 +81,7 @@ def configure():
     normalize = args.normalize
     class_vector = args.class_vector
     trade_off = args.trade_off
+    hierarchical = args.hierarchical
     pretrained = args.pretrained
     resume = args.resume
 
@@ -100,20 +103,44 @@ def configure():
 
     elif dataset == 'partnet':
         data_folder = 'data/PartNet/sem_seg_h5/'
-        list_train = os.path.join(data_folder, '%s-%d' % (category, level), 'train_files.txt')
-        list_val = os.path.join(data_folder, '%s-%d' % (category, level), 'val_files.txt')
-        list_test = os.path.join(data_folder, '%s-%d' % (category, level), 'test_files.txt')
 
-        with open('data/PartNet/after_merging_label_ids/%s-level-%d.txt' % (category, level), 'r') as fin:
-            num_class = len(fin.readlines()) + 1
-            print('Number of Classes: %d' % num_class)
+        if hierarchical:
+            train_paths = []
+            val_paths = []
+            test_paths = []
+            for i in range(3):
+                list_train = os.path.join(data_folder, '%s-%d' % (category, i+1), 'train_files.txt')
+                list_val = os.path.join(data_folder, '%s-%d' % (category, i+1), 'val_files.txt')
+                list_test = os.path.join(data_folder, '%s-%d' % (category, i+1), 'test_files.txt')
+                train_paths.append(list_train)
+                val_paths.append(list_val)
+                test_paths.append(list_test)
 
-        if not class_vector:
-            num_class = 16
+            train_dataset = H5Dataset_hierarchical(train_paths, fixed_points, i+1)
+            val_dataset = H5Dataset_hierarchical(val_paths, fixed_points, i+1)
+            test_dataset = H5Dataset_hierarchical(test_paths, fixed_points, i+1)
 
-        train_dataset = H5Dataset(list_train, fixed_points)
-        val_dataset = H5Dataset(list_val, fixed_points)
-        test_dataset = H5Dataset(list_test, fixed_points)
+            with open('data/PartNet/after_merging_label_ids/%s-level-%d.txt' % (category, 3), 'r') as fin:
+                num_class = len(fin.readlines()) + 1
+                print('Number of Classes: %d' % num_class)
+            if not class_vector:
+                num_class = 16
+        else:
+            list_train = os.path.join(data_folder, '%s-%d' % (category, level), 'train_files.txt')
+            list_val = os.path.join(data_folder, '%s-%d' % (category, level), 'val_files.txt')
+            list_test = os.path.join(data_folder, '%s-%d' % (category, level), 'test_files.txt')
+
+            train_dataset = H5Dataset(list_train, fixed_points)
+            val_dataset = H5Dataset(list_val, fixed_points)
+            test_dataset = H5Dataset(list_test, fixed_points)
+
+            with open('data/PartNet/after_merging_label_ids/%s-level-%d.txt' % (category, level), 'r') as fin:
+                num_class = len(fin.readlines()) + 1
+                print('Number of Classes: %d' % num_class)
+            if not class_vector:
+                num_class = 16
+
+
 
         train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers, drop_last=True)
         valid_loader = DataLoader(val_dataset, batch_size=batch, shuffle=False, num_workers=num_workers, drop_last=True)
@@ -158,7 +185,8 @@ def configure():
                             num_class=num_class,
                             normalize=normalize,
                             class_vector=class_vector,
-                            trade_off=trade_off
+                            trade_off=trade_off,
+                            hierarchical=hierarchical
                             )
 
 

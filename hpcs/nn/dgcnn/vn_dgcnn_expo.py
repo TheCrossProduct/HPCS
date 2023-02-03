@@ -103,6 +103,4 @@ class VN_DGCNN_expo(nn.Module):
         x = self.conv10(x)
         x = self.conv11(x)
 
-        x = self.manifold.expmap0(x)
-
         return x.transpose(1, 2)

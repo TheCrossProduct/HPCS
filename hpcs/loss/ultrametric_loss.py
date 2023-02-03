@@ -8,8 +8,6 @@ from hpcs.miner.triplet_margin_miner import RandomTripletMarginMiner
 from hpcs.miner.triplet_margin_loss import TripletMarginLoss
 
 from hpcs.distances.lca import hyp_lca
-from hpcs.distances.poincare import HyperbolicDistance
-from pytorch_metric_learning.utils import loss_and_miner_utils as lmu
 
 
 class TripletHyperbolicLoss(BaseMetricLossFunction):
@@ -41,12 +39,14 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
     def normalize_embeddings(self, embeddings):
         """Normalize leaves embeddings to have the lie on a diameter."""
         min_scale = 1e-4
-        max_scale = 1
-        return F.normalize(embeddings, p=2, dim=1) * torch.clamp(self.scale, min_scale, max_scale)
+        max_scale = 50
+        scale = self.scale.to(embeddings.device)
+        return F.normalize(embeddings, p=2, dim=1) * torch.clamp(scale, min_scale, max_scale)
 
     def compute_loss(self, embeddings, labels):
         triplet_indices_tuple = self.triplet_miner(embeddings, labels)
         hyp_indices_tuple = self.hyp_miner(embeddings, labels)
+
         anchor_idx, positive_idx, negative_idx = hyp_indices_tuple
 
         mat_sim = 0.5 * (1 + self.distance_sim(embeddings))
