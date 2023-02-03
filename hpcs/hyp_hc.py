@@ -244,6 +244,9 @@ class SimilarityHypHC(pl.LightningModule):
         test_loss_triplet, test_loss_hyphc, x_embedding, x_poincare, linkage_matrix, points, targets = self.forward(batch, testing=True)
         test_loss = test_loss_triplet + test_loss_hyphc
 
+        if self.hierarchical:
+            targets = targets[2]
+
         indexes = []
         for object_idx in range(points.size(0)):
             best_pred, best_k, best_score = get_optimal_k(targets[object_idx].cpu(), linkage_matrix[object_idx], 'iou')

@@ -4,13 +4,13 @@ python train.py \
   -level 1 \
   -fixed_points 256 \
   -model 'vn_dgcnn_expo' \
-  -embedding 4 \
+  -embedding 41 \
   -k 20 \
   -margin 0.05 \
   -t_per_anchor 50 \
   -fraction 1.2 \
   -temperature 1 \
   -epochs 20 \
-  -batch 6 \
-  -lr 0.005 \
+  -batch 2 \
+  -lr 0.01 \
   -accelerator 'gpu'
