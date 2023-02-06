@@ -167,6 +167,9 @@ class SimilarityHypHC(pl.LightningModule):
         x_poincare_reshape = x_poincare.contiguous().view(-1, self.embedding)
         targets_reshape = targets.view(-1)
 
+        if self.current_epoch > 15:
+            self.triplet_loss.triplet_miner.type_of_triplets = "all"
+
         losses = self.triplet_loss.compute_loss(embeddings=x_embedding_reshape,
                                                 poincare_emb=x_poincare_reshape,
                                                 labels=targets_reshape,
@@ -230,7 +233,7 @@ class SimilarityHypHC(pl.LightningModule):
 
         indexes = []
         for object_idx in range(points.size(0)):
-            best_pred, best_k, best_score = get_optimal_k(targets[object_idx].cpu(), linkage_matrix[object_idx], 'iou')
+            best_pred, best_k, best_score = get_optimal_k(targets[object_idx].cpu(), linkage_matrix[object_idx], 'ri')
             # iou_score, ri_score = eval_clustering(targets[object_idx].cpu(), linkage_matrix[object_idx])
             emb_poincare = self.triplet_loss.normalize_embeddings(x_poincare[object_idx]) if self.normalize else x_poincare[object_idx]
             plot_hyperbolic_eval(x=points[object_idx].T.cpu(),

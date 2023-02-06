@@ -350,7 +350,7 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, 
     plotter.show_axes_all()
 
     if show:
-        plotter.show()
+        plotter.show(interactive_update=True)
     else:
         return plotter
 
