@@ -2,13 +2,12 @@ import torch
 from torch.nn import functional as F
 
 from pytorch_metric_learning.losses import BaseMetricLossFunction, TripletMarginLoss
-from pytorch_metric_learning.distances import CosineSimilarity
 
 from hpcs.miner.triplet_margin_miner import RandomTripletMarginMiner
 from hpcs.miner.triplet_margin_loss import TripletMarginLoss
 
 from hpcs.distances.lca import hyp_lca
-from hpcs.distances.poincare import HyperbolicDistance
+from hpcs.distances.cosine import CosineSimilarity
 from pytorch_metric_learning.utils import loss_and_miner_utils as lmu
 
 
@@ -26,7 +25,7 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
 
         self.distance_sim = CosineSimilarity()
 
-        self.hyp_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=0, t_per_anchor=self.t_per_anchor, fraction=self.fraction, type_of_triplets='easy')
+        # self.hyp_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=0, t_per_anchor=self.t_per_anchor, fraction=self.fraction, type_of_triplets='all')
         self.triplet_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=self.margin, t_per_anchor=self.t_per_anchor, fraction=self.fraction, type_of_triplets='all')
 
         self.loss_triplet_sim = TripletMarginLoss(distance=self.distance_sim, margin=self.margin)
@@ -44,20 +43,23 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
         max_scale = 1
         return F.normalize(embeddings, p=2, dim=1) * torch.clamp(self.scale, min_scale, max_scale)
 
-    def compute_loss(self, embeddings, labels):
+    def compute_loss(self, embeddings, poincare_emb, labels):
+        embeddings = F.log_softmax(embeddings, dim=1)
         triplet_indices_tuple = self.triplet_miner(embeddings, labels)
-        hyp_indices_tuple = self.hyp_miner(embeddings, labels)
+
+        # hyp_indices_tuple = self.hyp_miner(embeddings, labels)
+        hyp_indices_tuple = triplet_indices_tuple
         anchor_idx, positive_idx, negative_idx = hyp_indices_tuple
 
-        mat_sim = 0.5 * (1 + self.distance_sim(embeddings))
+        mat_sim = self.distance_sim(embeddings)
 
         wij = mat_sim[anchor_idx, positive_idx]
         wik = mat_sim[anchor_idx, negative_idx]
         wjk = mat_sim[positive_idx, negative_idx]
 
-        e1 = embeddings[anchor_idx]
-        e2 = embeddings[positive_idx]
-        e3 = embeddings[negative_idx]
+        e1 = poincare_emb[anchor_idx]
+        e2 = poincare_emb[positive_idx]
+        e3 = poincare_emb[negative_idx]
 
         if self.normalize:
             e1 = self.normalize_embeddings(e1)
@@ -85,11 +87,11 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
             "loss_lca": {
                 "losses": loss_triplet_lca,
                 "indices": hyp_indices_tuple,
-                "reduction_type": "already_reduced",
+                # "reduction_type": "already_reduced",
             },
             "loss_sim": {
                 "losses": loss_triplet_sim,
                 "indices": triplet_indices_tuple,
-                "reduction_type": "already_reduced",
+                # "reduction_type": "already_reduced",
             },
         }

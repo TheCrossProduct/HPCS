@@ -66,7 +66,7 @@ class SimilarityHypHC(pl.LightningModule):
     def __init__(self, nn: torch.nn.Module, model_name: str = 'vn_dgcnn_partseg', train_rotation: str = 'so3', test_rotation: str = 'so3',
                  dataset: str = 'shapenet', lr: float = 1e-3, embedding: int = 6, k: int = 10, margin: float = 1.0, t_per_anchor: int = 50,
                  fraction: float = 1.2, temperature: float = 0.05, anneal_factor: float = 0.5, anneal_step: int = 0, num_class: int = 4,
-                 normalize: bool = False, class_vector: bool = False, trade_off: float = 0.1):
+                 normalize: bool = True, class_vector: bool = False, trade_off: float = 0.1):
         super(SimilarityHypHC, self).__init__()
         self.save_hyperparameters()
         self.model = nn
@@ -130,7 +130,7 @@ class SimilarityHypHC(pl.LightningModule):
         if trot is not None:
             points = trot.transform_points(points.cpu())
 
-        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        device = self.device
         points, label, targets = points.float().to(device), label.long().to(device), targets.long().to(device)
         points = points.transpose(2, 1)
 
@@ -151,19 +151,24 @@ class SimilarityHypHC(pl.LightningModule):
                     class_vector = parts.sum(dim=0).float()
                     batch_class_vector.append(class_vector)
                 decode_vector = torch.stack(batch_class_vector)
+            else:
+                raise KeyError("Dataset not known")
         else:
             num_categories = 16
             decode_vector = to_categorical(label, num_categories)
 
 
         x_embedding = self.model(points, decode_vector)
+        x_embedding_norm = x_embedding.norm(dim=-1, p=2, keepdim=True)
+        x_embedding_renorm = x_embedding / x_embedding_norm
         scale = self.scale.to(x_embedding.device)
-        x_poincare = scale * x_embedding
-
+        x_poincare = scale * x_embedding_renorm
+        x_embedding_reshape = x_embedding.contiguous().view(-1, self.embedding)
         x_poincare_reshape = x_poincare.contiguous().view(-1, self.embedding)
-        targets_reshape = targets.view(-1, 1)[:, 0]
+        targets_reshape = targets.view(-1)
 
-        losses = self.triplet_loss.compute_loss(embeddings=x_poincare_reshape,
+        losses = self.triplet_loss.compute_loss(embeddings=x_embedding_reshape,
+                                                poincare_emb=x_poincare_reshape,
                                                 labels=targets_reshape,
                                                 )
 

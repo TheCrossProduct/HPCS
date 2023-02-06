@@ -1,6 +1,7 @@
 data/**
 logs/**
-
+wandb/**
+notebooks/*.yaml
 # Default ignored files
 /shelf/
 /workspace.xml

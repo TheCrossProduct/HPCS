@@ -23,13 +23,17 @@ class RandomTripletMarginMiner(miners.TripletMarginMiner):
 
         if self.type_of_triplets == "easy":
             threshold_condition = triplet_margin > self.margin
+
+        elif self.type_of_triplets == "all":
+            threshold_condition = triplet_margin >= 0
+            # threshold_condition &= triplet_margin <= 0
         else:
             threshold_condition = triplet_margin <= self.margin
             if self.type_of_triplets == "hard":
                 threshold_condition &= triplet_margin <= 0
             elif self.type_of_triplets == "semihard":
                 threshold_condition &= triplet_margin > 0
-
+        # print(f"Number of easy triplets : {threshold_condition.sum()}")
         return (
             anchor_idx[threshold_condition],
             positive_idx[threshold_condition],
