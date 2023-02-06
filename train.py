@@ -21,13 +21,7 @@ from hpcs.nn.dgcnn import VN_DGCNN_expo
 from hpcs.nn.pointnet import POINTNET_partseg
 from hpcs.nn.pointnet import VN_POINTNET_partseg
 
-def get_wandb_mode():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--wandb','-wandb',default='online',type=str, help='Online/Offline WandB mode (Useful in JeanZay)')
-    args = parser.parse_args()
-    return args.wandb
-
-def configure():
+def read_configutation():
     parser = argparse.ArgumentParser()
     parser.add_argument('--log', default='logs', type=str, help='dirname for logs')
     parser.add_argument('--dataset', '-dataset', default='shapenet', type=str, help='name of dataset to use')
@@ -55,12 +49,14 @@ def configure():
     parser.add_argument('--normalize', '-normalize', default=True, type=bool, help='normalize hyperbolic space')
     parser.add_argument('--class_vector', '-class_vector', default=False, type=bool, help='class vector to decode')
     parser.add_argument('--trade_off', '-trade_off', default=0.5, type=float, help='control trade-off between two losses')
-    parser.add_argument('--hierarchical', '-hierarchical', default=False, type=bool, help='hierarchical loss')
     parser.add_argument('--pretrained', '-pretrained', default=False, type=bool, help='load pretrained model')
     parser.add_argument('--resume', '-resume', default=False, type=bool, help='resume training on model')
     parser.add_argument('--wandb','-wandb',default='online',type=str, help='Online/Offline WandB mode (Useful in JeanZay)')
     args = parser.parse_args()
+    return args
 
+def configure(args):
+    wandb.config.update(args)
     log = args.log
     dataset = args.dataset
     category = args.category
@@ -256,6 +252,7 @@ def train(model, trainer, train_loader, valid_loader, test_loader, resume):
 
 
 if __name__ == "__main__":
-    wandb.init(project='HPCS',mode=get_wandb_mode())
-    model, trainer, train_loader, valid_loader, test_loader, resume, wandb_mode = configure()
+    args=read_configutation()
+    wandb.init(project='HPCS',mode=args.wandb)
+    model, trainer, train_loader, valid_loader, test_loader, resume = configure(args)
     train(model, trainer, train_loader, valid_loader, test_loader, resume)
