@@ -50,7 +50,7 @@ def configure():
     parser.add_argument('--normalize', '-normalize', default=True, type=bool, help='normalize hyperbolic space')
     parser.add_argument('--class_vector', '-class_vector', default=False, type=bool, help='class vector to decode')
     parser.add_argument('--trade_off', '-trade_off', default=0.5, type=float, help='control trade-off between two losses')
-    parser.add_argument('--hierarchical', '-hierarchical', default=True, type=bool, help='hierarchical loss')
+    parser.add_argument('--hierarchical', '-hierarchical', default=False, type=bool, help='hierarchical loss')
     parser.add_argument('--pretrained', '-pretrained', default=False, type=bool, help='load pretrained model')
     parser.add_argument('--resume', '-resume', default=False, type=bool, help='resume training on model')
     args = parser.parse_args()

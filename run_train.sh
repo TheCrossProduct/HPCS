@@ -1,6 +1,6 @@
 python train.py \
   -dataset 'partnet' \
-  -category 'Lamp' \
+  -category 'Chair' \
   -level 1 \
   -fixed_points 256 \
   -model 'vn_dgcnn_expo' \
@@ -12,5 +12,5 @@ python train.py \
   -temperature 1 \
   -epochs 20 \
   -batch 2 \
-  -lr 0.01 \
+  -lr 0.005 \
   -accelerator 'gpu'
