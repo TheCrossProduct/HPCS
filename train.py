@@ -21,6 +21,11 @@ from hpcs.nn.dgcnn import VN_DGCNN_expo
 from hpcs.nn.pointnet import POINTNET_partseg
 from hpcs.nn.pointnet import VN_POINTNET_partseg
 
+def get_wandb_mode():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--wandb','-wandb',default='online',type=str, help='Online/Offline WandB mode (Useful in JeanZay)')
+    args = parser.parse_args()
+    return args.wandb
 
 def configure():
     parser = argparse.ArgumentParser()
@@ -251,6 +256,6 @@ def train(model, trainer, train_loader, valid_loader, test_loader, resume):
 
 
 if __name__ == "__main__":
+    wandb.init(project='HPCS',mode=get_wandb_mode())
     model, trainer, train_loader, valid_loader, test_loader, resume, wandb_mode = configure()
-    wandb.init(project='HPCS',mode=wandb_mode)
     train(model, trainer, train_loader, valid_loader, test_loader, resume)
