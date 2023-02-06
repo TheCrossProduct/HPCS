@@ -2,12 +2,11 @@ import torch
 from torch.nn import functional as F
 
 from pytorch_metric_learning.losses import BaseMetricLossFunction, TripletMarginLoss
-from pytorch_metric_learning.distances import CosineSimilarity
 
 from hpcs.miner.triplet_margin_miner import RandomTripletMarginMiner
 from hpcs.miner.triplet_margin_loss import TripletMarginLoss
 
-from hpcs.distances.lca import hyp_lca
+from hpcs.distances import hyp_lca, CosineSimilarity
 
 
 class TripletHyperbolicLoss(BaseMetricLossFunction):
@@ -25,7 +24,7 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
         self.distance_sim = CosineSimilarity()
 
         self.hyp_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=0, t_per_anchor=self.t_per_anchor, fraction=self.fraction, type_of_triplets='easy')
-        self.triplet_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=self.margin, t_per_anchor=self.t_per_anchor, fraction=self.fraction, type_of_triplets='all')
+        self.triplet_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=self.margin, t_per_anchor=self.t_per_anchor, fraction=self.fraction, type_of_triplets='semihard')
 
         self.loss_triplet_sim = TripletMarginLoss(distance=self.distance_sim, margin=self.margin)
 
@@ -49,7 +48,7 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
 
         anchor_idx, positive_idx, negative_idx = hyp_indices_tuple
 
-        mat_sim = 0.5 * (1 + self.distance_sim(embeddings))
+        mat_sim = self.distance_sim(embeddings)
 
         wij = mat_sim[anchor_idx, positive_idx]
         wik = mat_sim[anchor_idx, negative_idx]
@@ -67,7 +66,6 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
         dij = hyp_lca(e1, e2, return_coord=False)
         dik = hyp_lca(e1, e3, return_coord=False)
         djk = hyp_lca(e2, e3, return_coord=False)
-
 
         # loss proposed by Chami et al.
         sim_triplet = torch.stack([wij, wik, wjk]).T

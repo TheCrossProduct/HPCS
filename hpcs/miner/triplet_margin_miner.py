@@ -23,6 +23,10 @@ class RandomTripletMarginMiner(miners.TripletMarginMiner):
 
         if self.type_of_triplets == "easy":
             threshold_condition = triplet_margin > self.margin
+
+        elif self.type_of_triplets == "all":
+            threshold_condition = triplet_margin >= 0
+            # threshold_condition &= triplet_margin <= 0
         else:
             threshold_condition = triplet_margin <= self.margin
             if self.type_of_triplets == "hard":
