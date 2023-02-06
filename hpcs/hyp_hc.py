@@ -224,7 +224,6 @@ class SimilarityHypHC(pl.LightningModule):
         self.log("train_loss", {"total_loss": loss, "triplet_loss": loss_triplet, "hyphc_loss": loss_hyphc})
         self.log("scale", self.scale)
         self.log("temperature", self.temperature)
-        self.log("lr", self.lr)
         return {'loss': loss, 'progress_bar': {'triplet': loss_triplet, 'hyphc': loss_hyphc}}
 
     def training_epoch_end(self, outputs):

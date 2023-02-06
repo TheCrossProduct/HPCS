@@ -12,7 +12,7 @@ from data.PartNet.Hierarchical import H5Dataset_hierarchical
 import wandb
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping,LearningRateMonitor
 
 from hpcs.hyp_hc import SimilarityHypHC
 from hpcs.nn.dgcnn import DGCNN_partseg
@@ -220,10 +220,11 @@ def configure(args):
         patience=patience,
         verbose=True,
         mode='min')
-
+    lr_monitor = LearningRateMonitor(logging_interval='step')
+    
     trainer = pl.Trainer(accelerator=accelerator,
                          max_epochs=epochs,
-                         callbacks=[early_stop_callback, checkpoint_callback],
+                         callbacks=[early_stop_callback, checkpoint_callback, lr_monitor],
                          logger=logger,
                          limit_test_batches=10
                          )
