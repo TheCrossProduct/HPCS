@@ -48,11 +48,11 @@ class VN_DGCNN_expo(nn.Module):
                                    self.bn7,
                                    nn.LeakyReLU(negative_slope=0.2))
 
-        self.dp1 = nn.Dropout(p=0.5)
+        self.dp1 = nn.Dropout(p=self.dropout)
         self.conv9 = nn.Sequential(nn.Conv1d(256, 256, kernel_size=1, bias=False),
                                    self.bn9,
                                    nn.LeakyReLU(negative_slope=0.2))
-        self.dp2 = nn.Dropout(p=0.5)
+        self.dp2 = nn.Dropout(p=self.dropout)
         self.conv10 = nn.Sequential(nn.Conv1d(256, 128, kernel_size=1, bias=False),
                                     self.bn10,
                                     nn.LeakyReLU(negative_slope=0.2))
