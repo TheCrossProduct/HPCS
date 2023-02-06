@@ -53,6 +53,7 @@ def configure():
     parser.add_argument('--hierarchical', '-hierarchical', default=False, type=bool, help='hierarchical loss')
     parser.add_argument('--pretrained', '-pretrained', default=False, type=bool, help='load pretrained model')
     parser.add_argument('--resume', '-resume', default=False, type=bool, help='resume training on model')
+    parser.add_argument('--wandb','-wandb',default='online',type=str, help='Online/Offline WandB mode (Useful in JeanZay)')
     args = parser.parse_args()
 
     log = args.log
@@ -84,6 +85,7 @@ def configure():
     hierarchical = args.hierarchical
     pretrained = args.pretrained
     resume = args.resume
+    wandb_mode=args.wandb
 
 
     if dataset == 'shapenet':
@@ -225,7 +227,7 @@ def configure():
                          limit_test_batches=10
                          )
 
-    return model, trainer, train_loader, valid_loader, test_loader, resume
+    return model, trainer, train_loader, valid_loader, test_loader, resume,wandb_mode
 
 
 def train(model, trainer, train_loader, valid_loader, test_loader, resume):
@@ -249,6 +251,6 @@ def train(model, trainer, train_loader, valid_loader, test_loader, resume):
 
 
 if __name__ == "__main__":
-    wandb.init(project='HPCS')
-    model, trainer, train_loader, valid_loader, test_loader, resume = configure()
+    model, trainer, train_loader, valid_loader, test_loader, resume, wandb_mode = configure()
+    wandb.init(project='HPCS',mode=wandb_mode)
     train(model, trainer, train_loader, valid_loader, test_loader, resume)
