@@ -13,6 +13,7 @@ from hpcs.distances.poincare import project
 from hpcs.loss.ultrametric_loss import TripletHyperbolicLoss
 from hpcs.utils.viz import plot_hyperbolic_eval
 from hpcs.utils.scores import get_optimal_k
+from hpcs.distances.lca import hyp_lca
 
 
 def to_categorical(y, num_classes):
@@ -103,10 +104,11 @@ class SimilarityHypHC(pl.LightningModule):
 
     def _decode_linkage(self, leaves_embeddings):
         """Build linkage matrix from leaves' embeddings. Assume points are normalized to same radius."""
+        sim_fn = lambda x, y: 1.0 / hyp_lca(x, y, return_coord=False).detach().numpy()
         if self.normalize:
             leaves_embeddings = self.triplet_loss.normalize_embeddings(leaves_embeddings)
         leaves_embeddings = project(leaves_embeddings).detach().cpu()
-        Z = linkage(leaves_embeddings, method='ward', metric='euclidean')
+        Z = linkage(leaves_embeddings, method='single', metric=sim_fn)
         return Z
 
 
@@ -169,6 +171,7 @@ class SimilarityHypHC(pl.LightningModule):
 
         if self.current_epoch > 15:
             self.triplet_loss.triplet_miner.type_of_triplets = "all"
+            self.triplet_loss.temperature = 1.0
 
         losses = self.triplet_loss.compute_loss(embeddings=x_embedding_reshape,
                                                 poincare_emb=x_poincare_reshape,
@@ -233,7 +236,7 @@ class SimilarityHypHC(pl.LightningModule):
 
         indexes = []
         for object_idx in range(points.size(0)):
-            best_pred, best_k, best_score = get_optimal_k(targets[object_idx].cpu(), linkage_matrix[object_idx], 'ri')
+            best_pred, best_k, best_score = get_optimal_k(targets[object_idx].cpu(), linkage_matrix[object_idx], 'iou')
             # iou_score, ri_score = eval_clustering(targets[object_idx].cpu(), linkage_matrix[object_idx])
             emb_poincare = self.triplet_loss.normalize_embeddings(x_poincare[object_idx]) if self.normalize else x_poincare[object_idx]
             plot_hyperbolic_eval(x=points[object_idx].T.cpu(),
