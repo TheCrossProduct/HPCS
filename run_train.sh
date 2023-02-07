@@ -10,7 +10,7 @@ python train.py \
   -t_per_anchor 50 \
   -fraction 1.2 \
   -temperature 1 \
-  -epochs 20 \
-  -batch 2 \
+  -epochs 10 \
+  -batch 6 \
   -lr 0.005 \
   -accelerator 'gpu'

@@ -49,9 +49,10 @@ def read_configutation():
     parser.add_argument('--normalize', '-normalize', default=True, type=bool, help='normalize hyperbolic space')
     parser.add_argument('--class_vector', '-class_vector', default=False, type=bool, help='class vector to decode')
     parser.add_argument('--trade_off', '-trade_off', default=0.5, type=float, help='control trade-off between two losses')
+    parser.add_argument('--hierarchical', '-hierarchical', default=False, type=bool, help='hierarchical loss')
     parser.add_argument('--pretrained', '-pretrained', default=False, type=bool, help='load pretrained model')
     parser.add_argument('--resume', '-resume', default=False, type=bool, help='resume training on model')
-    parser.add_argument('--wandb','-wandb',default='online',type=str, help='Online/Offline WandB mode (Useful in JeanZay)')
+    parser.add_argument('--wandb','-wandb',default='online', type=str, help='Online/Offline WandB mode (Useful in JeanZay)')
     args = parser.parse_args()
     return args
 
@@ -229,7 +230,7 @@ def configure(args):
                          limit_test_batches=10
                          )
 
-    return model, trainer, train_loader, valid_loader, test_loader, resume,wandb_mode
+    return model, trainer, train_loader, valid_loader, test_loader, resume, wandb_mode
 
 
 def train(model, trainer, train_loader, valid_loader, test_loader, resume):
@@ -254,6 +255,6 @@ def train(model, trainer, train_loader, valid_loader, test_loader, resume):
 
 if __name__ == "__main__":
     args=read_configutation()
-    wandb.init(project='HPCS',mode=args.wandb)
-    model, trainer, train_loader, valid_loader, test_loader, resume = configure(args)
+    wandb.init(project='HPCS', mode=args.wandb)
+    model, trainer, train_loader, valid_loader, test_loader, resume, wandb_mode = configure(args)
     train(model, trainer, train_loader, valid_loader, test_loader, resume)
