@@ -1,5 +1,5 @@
 """LCA construction utils."""
-
+import numpy as np
 import torch
 
 from .poincare import MIN_NORM, hyp_dist_o
@@ -40,6 +40,11 @@ def hyp_lca(a, b, return_coord=True):
 
     More optimized than hyp_lca1
     """
+    if isinstance(a, np.ndarray):
+        a = torch.Tensor(a)
+    if isinstance(b, np.ndarray):
+        b = torch.Tensor(b)
+
     r = reflection_center(a)
     b_inv = isometric_transform(r, b)
     o_inv = a
