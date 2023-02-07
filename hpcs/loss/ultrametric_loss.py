@@ -2,6 +2,7 @@ import torch
 from torch.nn import functional as F
 
 from pytorch_metric_learning.losses import BaseMetricLossFunction, TripletMarginLoss
+from pytorch_metric_learning.losses import CosFaceLoss
 
 from hpcs.miner.triplet_margin_miner import RandomTripletMarginMiner
 from hpcs.miner.triplet_margin_loss import TripletMarginLoss
@@ -11,7 +12,8 @@ from hpcs.distances import hyp_lca, CosineSimilarity
 
 class TripletHyperbolicLoss(BaseMetricLossFunction):
     def __init__(self, margin: float = 1.0, t_per_anchor: int = 50, fraction: float = 1.2, scale: float = 1e-3,
-                 temperature: float = 0.05, anneal_factor: float = 0.5, normalize: bool = False):
+                 temperature: float = 0.05, anneal_factor: float = 0.5, normalize: bool = False, num_class: int = 4,
+                 embedding: int = 4):
         super(TripletHyperbolicLoss, self).__init__()
         self.margin = margin
         self.t_per_anchor = t_per_anchor
@@ -20,14 +22,16 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
         self.temperature = temperature
         self.anneal_factor = anneal_factor
         self.normalize = normalize
+        self.num_class = num_class
+        self.embedding = embedding
 
         self.distance_sim = CosineSimilarity()
 
         self.hyp_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=0, t_per_anchor=self.t_per_anchor, fraction=self.fraction, type_of_triplets='easy')
-        self.triplet_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=self.margin, t_per_anchor=self.t_per_anchor, fraction=self.fraction, type_of_triplets='semihard')
+        self.triplet_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=self.margin, t_per_anchor=self.t_per_anchor, fraction=self.fraction, type_of_triplets='hard')
 
         self.loss_triplet_sim = TripletMarginLoss(distance=self.distance_sim, margin=self.margin)
-
+        self.loss_cos = CosFaceLoss(num_classes=self.num_class, embedding_size=self.embedding, margin=0.35, scale=64)
 
     def anneal_temperature(self):
         min_scale = 0.2
@@ -77,7 +81,8 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
 
         loss_triplet_lca = torch.mean(total) + mat_sim.mean()
 
-        loss_triplet_sim = self.loss_triplet_sim(embeddings, labels, triplet_indices_tuple)
+        # loss_triplet_sim = self.loss_triplet_sim(embeddings, labels, triplet_indices_tuple)
+        loss_cos = self.loss_cos(embeddings, labels.long())
 
         return {
             "loss_lca": {
@@ -86,8 +91,8 @@ class TripletHyperbolicLoss(BaseMetricLossFunction):
                 "reduction_type": "already_reduced",
             },
             "loss_sim": {
-                "losses": loss_triplet_sim,
-                "indices": triplet_indices_tuple,
+                "losses": loss_cos,
+                # "indices": triplet_indices_tuple,
                 "reduction_type": "already_reduced",
             },
         }

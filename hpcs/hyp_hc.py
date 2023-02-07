@@ -10,10 +10,10 @@ from pytorch3d.transforms import RotateAxisAngle, Rotate, random_rotations
 
 from hpcs.optim import RAdam
 from hpcs.distances.poincare import project
-from hpcs.distances.poincare import mobius_add
 from hpcs.loss.ultrametric_loss import TripletHyperbolicLoss
 from hpcs.utils.viz import plot_hyperbolic_eval
 from hpcs.utils.scores import get_optimal_k
+from hpcs.distances.poincare import mobius_add
 
 
 def to_categorical(y, num_classes):
@@ -28,13 +28,6 @@ def remap_labels(y_true):
     for i, l in enumerate(torch.unique(y_true)):
         y_remap[y_true==l] = i
     return y_remap
-
-def expmap(p: torch.Tensor, v: torch.Tensor, r: torch.Tensor):
-    v_norm, p_norm = torch.norm(v), torch.norm(p)
-    second_term = torch.tanh((r * v_norm) / (r**2 - p_norm**2)) * (r * v / v_norm)
-    p = p.to(second_term.device)
-    y = mobius_add(p, second_term)
-    return y
 
 
 class SimilarityHypHC(pl.LightningModule):
@@ -98,7 +91,7 @@ class SimilarityHypHC(pl.LightningModule):
         self.hierarchical = hierarchical
 
         if self.normalize:
-            self.scale = torch.Tensor([0.99])
+            self.scale = torch.nn.Parameter(torch.Tensor([0.99]), requires_grad=True)
         else:
             self.scale = torch.Tensor([0.99])
 
@@ -108,7 +101,9 @@ class SimilarityHypHC(pl.LightningModule):
                                                   scale=self.scale,
                                                   temperature=self.temperature,
                                                   anneal_factor=self.anneal_factor,
-                                                  normalize=self.normalize)
+                                                  normalize=self.normalize,
+                                                  num_class=self.num_class,
+                                                  embedding=self.embedding)
 
     def _decode_linkage(self, leaves_embeddings):
         """Build linkage matrix from leaves' embeddings. Assume points are normalized to same radius."""
@@ -152,13 +147,12 @@ class SimilarityHypHC(pl.LightningModule):
                 batch_class_vector.append(class_vector)
             decode_vector = torch.stack(batch_class_vector)
         else:
-            num_categories = 16
+            num_categories = self.num_class
             decode_vector = to_categorical(label, num_categories)
 
 
-        x_embedding = self.model(points, decode_vector)
-        scale = self.scale.to(x_embedding.device)
-        x_embedding = expmap(torch.Tensor([0]), x_embedding, scale)
+        scale = self.scale.to(points.device)
+        x_embedding = self.model(points, decode_vector, scale)
         x_poincare = x_embedding
 
         x_poincare_reshape = x_poincare.contiguous().view(-1, self.embedding)

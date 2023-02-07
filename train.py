@@ -102,7 +102,7 @@ def configure(args):
         if class_vector:
             num_class = len(train_dataset.seg_classes[category])
         else:
-            num_class = 16
+            num_class = len(train_dataset.seg_classes[category])
 
     elif dataset == 'partnet':
         data_folder = 'data/PartNet/sem_seg_h5/'

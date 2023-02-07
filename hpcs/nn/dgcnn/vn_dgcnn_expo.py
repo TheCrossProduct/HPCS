@@ -4,6 +4,15 @@ from hpcs.nn.dgcnn.utils.vn_layers import *
 from hpcs.nn.dgcnn.utils.vn_dgcnn_util import get_graph_feature
 from hpcs.nn.dgcnn.utils.poincareball import PoincareBall
 from hpcs.nn.dgcnn.utils.manifold_layers import MobiusLayer
+from hpcs.distances.poincare import mobius_add
+
+
+def expmap(p: torch.Tensor, v: torch.Tensor, r: torch.Tensor):
+    v_norm, p_norm = torch.norm(v), torch.norm(p)
+    second_term = torch.tanh((r * v_norm) / (r**2 - p_norm**2)) * (r * v / v_norm)
+    p = p.to(second_term.device)
+    y = mobius_add(p, second_term)
+    return y
 
 
 class VN_DGCNN_expo(nn.Module):
@@ -58,7 +67,7 @@ class VN_DGCNN_expo(nn.Module):
                                     nn.LeakyReLU(negative_slope=0.2))
         self.conv11 = nn.Conv1d(128, self.out_features, kernel_size=1, bias=False)
 
-    def forward(self, x, l):
+    def forward(self, x, l, scale):
         batch_size = x.size(0)
         num_points = x.size(2)
 
@@ -102,5 +111,7 @@ class VN_DGCNN_expo(nn.Module):
         x = self.dp2(x)
         x = self.conv10(x)
         x = self.conv11(x)
+
+        x = expmap(torch.Tensor([0]), x, scale)
 
         return x.transpose(1, 2)
