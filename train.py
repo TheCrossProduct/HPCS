@@ -92,6 +92,7 @@ def configure(args):
 
     if dataset == 'shapenet':
         data_folder = 'data/ShapeNet/raw'
+        #data_folder = '/gpfsscratch/rech/qpj/uyn98cq/ShapeNet/raw'
         train_dataset = PartNormalDataset(root=data_folder, npoints=fixed_points, split='train', class_choice=category)
         valid_dataset = PartNormalDataset(root=data_folder, npoints=fixed_points, split='val', class_choice=category)
         test_dataset = PartNormalDataset(root=data_folder, npoints=fixed_points, split='test', class_choice=category)
@@ -107,6 +108,7 @@ def configure(args):
 
     elif dataset == 'partnet':
         data_folder = 'data/PartNet/sem_seg_h5/'
+        #data_folder = '/gpfsscratch/rech/qpj/uyn98cq/PartNet/sem_seg_h5'
 
         if hierarchical:
             train_paths = []
