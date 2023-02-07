@@ -13,6 +13,7 @@ from scipy.cluster.hierarchy import dendrogram, fcluster, set_link_color_palette
 from sklearn.metrics.cluster import adjusted_rand_score as ri
 
 from sklearn.manifold import TSNE
+from umap import UMAP
 from scipy.sparse import find
 
 COLORS = np.array(['#377eb8', '#ff7f00', '#4daf4a', '#a65628', '#f781bf', '#984ea3', '#999999', '#e41a1c', '#000000',
@@ -226,6 +227,30 @@ def plot_tsne(X, y, idx=None, eps=1e-1):
     plt.ylim(tsne_proj[:, 1].min() - eps, tsne_proj[:, 1].max() + eps)
 
 
+def plot_poincare(X, y, idx=None):
+    if (X.shape[1] == 2):
+        disk_x = X[:, 0]
+        disk_y = X[:, 1]
+    else: # when projecting on higher dimensional poincare disk we use UMAP to reproject to poincare ball
+        hyperbolic_mapper = UMAP(output_metric='hyperboloid', random_state=42).fit(X)
+        # projection to poincare disk
+        pt_x = hyperbolic_mapper.embedding_[:, 0]
+        pt_y = hyperbolic_mapper.embedding_[:, 1]
+        length = np.sqrt(1 + np.sum(hyperbolic_mapper.embedding_ ** 2, axis=1))
+
+        disk_x = pt_x / (1 + length)
+        disk_y = pt_y / (1 + length)
+
+    ec = COLORS[y % len(COLORS)]
+    plt.scatter(disk_x, disk_y, color=ec)
+    if idx is not None:
+        iec = COLORS[y[idx] % len(COLORS)]
+        plt.scatter(disk_x[idx], disk_y[idx], color=iec)
+    plt.xlim(-1.1, 1.1)
+    plt.ylim(-1.1, 1.1)
+
+
+
 def plot_dendrogram(linkage_matrix, n_clusters=0, lastp=30):
     extra = {} if lastp is None else dict(truncate_mode='lastp', p=lastp)
     set_link_color_palette(list(COLORS))
@@ -273,6 +298,8 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, 
     """
     Auxiliary functions to plot results about hyperbolic clustering
     """
+    plt.style.use('ggplot')
+
     if isinstance(x, torch.Tensor):
         pts = x.cpu().detach().numpy()
     else:
@@ -325,16 +352,20 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, 
     ax.set_title('TSNE Embedding')
 
     chart = pv.ChartMPL(f)
-    chart.background_color = 'w'
+    chart.background_color = '#E5E5E5'
     plotter.add_chart(chart)
 
     idx += 1
     plotter.subplot(0, 3)
     f, ax = plt.subplots(tight_layout=True)
-    plot_tsne(emb_poincare, y_pred)
-    ax.set_title('TSNE Poincaré Ball')
+    plot_poincare(emb_poincare, y_pred)
+    boundary = plt.Circle((0, 0), 1, fc='none', ec='k')
+
+    ax.add_artist(boundary)
+    ax.axis('equal')
+    ax.set_title('UMAP Poincaré Ball')
     chart = pv.ChartMPL(f)
-    chart.background_color = 'w'
+    chart.background_color = '#E5E5E5'
     plotter.add_chart(chart)
 
 
