@@ -1,3 +1,5 @@
+from typing import Union
+
 import torch
 from torch.nn import functional as F
 
@@ -10,8 +12,78 @@ from hpcs.miner.triplet_margin_loss import TripletMarginLoss
 from hpcs.distances import hyp_lca, CosineSimilarity
 
 
+class HyperbolicHCLoss(BaseMetricLossFunction):
+    def __init__(self, temperature: float = 0.05, t_per_anchor: int = 50, distance: str = 'cosine'):
+        super(HyperbolicHCLoss, self).__init__()
+        self.temperature = temperature
+        self.t_per_anchor = t_per_anchor
+
+        if distance == 'cosine':
+            self.distance_sim = CosineSimilarity()
+        else:
+            raise KeyError(f'No implementation available for distance: {distance} ')
+    def normalize_embeddings(self, embeddings, scale):
+        """Normalize leaves embeddings to have the lie on a diameter."""
+        min_scale = 1e-4
+        max_scale = 50
+        return F.normalize(embeddings, p=2, dim=1) * torch.clamp(scale, min_scale, max_scale)
+
+    def get_triplets(self, n_samples):
+        n_triplets = self.t_per_anchor * (n_samples * (n_samples -1 ) // 2)
+
+        ij = torch.combinations(torch.arange(n_samples), r=2)
+        ij = ij.repeat_interleave(self.t_per_anchor, dim=0)
+
+        # sampling randomly the third element
+        k = torch.randint(n_samples, (n_triplets, ), dtype=torch.long)
+        # removing pts where i == k or j == k
+        mask_i = ij[:, 0] != k
+        mask_j = ij[:, 1] != k
+        mask = torch.logical_and(mask_i, mask_j)
+
+        return ij[mask,0], ij[mask, 1], k[mask]
+
+    def compute_loss(self, embeddings, scale):
+        hyp_indices_tuple = self.get_triplets(embeddings.shape[0])
+        i, j, k = hyp_indices_tuple
+        # move indices to correct device
+        i = i.to(embeddings.device)
+        j = j.to(embeddings.device)
+        k = k.to(embeddings.device)
+
+        mat_sim = self.distance_sim(embeddings)
+
+        wij = mat_sim[i, j]
+        wik = mat_sim[i, k]
+        wjk = mat_sim[j, k]
+
+        e1 = self.normalize_embeddings(embeddings[i], scale)
+        e2 = self.normalize_embeddings(embeddings[j], scale)
+        e3 = self.normalize_embeddings(embeddings[k], scale)
+
+        dij = hyp_lca(e1, e2, return_coord=False).flatten()  # we flatten to avoid warnings
+        dik = hyp_lca(e1, e3, return_coord=False).flatten()
+        djk = hyp_lca(e2, e3, return_coord=False).flatten()
+
+        # loss proposed by Chami et al.
+        sim_triplet = torch.stack([wij, wik, wjk]).T
+        lca_triplet = torch.stack([dij, dik, djk]).T
+        weights = torch.softmax(lca_triplet / self.temperature, dim=-1)
+
+        w_ord = torch.sum(sim_triplet * weights, dim=-1, keepdim=True)
+        total = torch.sum(sim_triplet, dim=-1, keepdim=True) - w_ord
+
+        loss_triplet_lca = torch.mean(total) + mat_sim.mean()
+        return {
+            "loss_lca": {
+                "losses": loss_triplet_lca,
+                "indices": hyp_indices_tuple,
+                "reduction_type": "already_reduced",
+            }
+        }
+
 class TripletHyperbolicLoss(BaseMetricLossFunction):
-    def __init__(self, margin: float = 1.0, t_per_anchor: int = 50, fraction: float = 1.2, scale: float = 1e-3,
+    def __init__(self, margin: float = 1.0, t_per_anchor: int = 50, fraction: float = 1.2, scale: Union[float, torch.tensor, torch.nn.Parameter] = 1e-3,
                  temperature: float = 0.05, anneal_factor: float = 0.5, normalize: bool = False, num_class: int = 4,
                  embedding: int = 4):
         super(TripletHyperbolicLoss, self).__init__()
