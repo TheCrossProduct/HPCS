@@ -107,12 +107,14 @@ class PartNormalDataset(Dataset):
                 self.cache[index] = (point_set, cls, seg)
         point_set[:, 0:3] = pc_normalize(point_set[:, 0:3])
 
-        choice = np.random.choice(len(seg), self.npoints, replace=True)
-        # resample
-        point_set = point_set[choice, :]
-        seg = seg[choice]
-
-        return point_set, cls, seg
+        if self.npoints>0:
+            choice = np.random.choice(len(seg), self.npoints, replace=True)
+            # resample
+            point_set = point_set[choice, :]
+            seg = seg[choice]
+            return point_set, cls, seg
+        else:
+            return point_set, cls, seg
 
     def __len__(self):
         return len(self.datapath)
