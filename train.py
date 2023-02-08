@@ -95,11 +95,11 @@ def configure(args):
         #data_folder = '/gpfsscratch/rech/qpj/uyn98cq/ShapeNet/raw'
         train_dataset = PartNormalDataset(root=data_folder, npoints=fixed_points, split='train', class_choice=category)
         valid_dataset = PartNormalDataset(root=data_folder, npoints=fixed_points, split='val', class_choice=category)
-        test_dataset = PartNormalDataset(root=data_folder, npoints=fixed_points, split='test', class_choice=category)
+        test_dataset = PartNormalDataset(root=data_folder, npoints=0, split='test', class_choice=category)
 
         train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers, drop_last=True)
         valid_loader = DataLoader(valid_dataset, batch_size=batch, shuffle=False, num_workers=num_workers, drop_last=True)
-        test_loader = DataLoader(test_dataset, batch_size=batch, shuffle=False, num_workers=num_workers, drop_last=True)
+        test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=num_workers, drop_last=True)
 
         if class_vector:
             num_class = len(train_dataset.seg_classes[category])
