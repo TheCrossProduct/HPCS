@@ -5,8 +5,8 @@ from torch.utils.data import DataLoader
 from torch.nn import functional as F
 from hpcs.nn.dgcnn import VN_DGCNN_partseg
 from hpcs.utils.math import rot_3D
-from hpcs.hyp_hc import remap_labels, to_categorical
-from data.ShapeNet.ShapeNetDataLoader import PartNormalDataset
+from hpcs.utils.data import remap_labels, to_categorical
+from hpcs.data import ShapeNetDataset
 import pyvista as pv
 
 class TestRotationInvariance(unittest.TestCase):
@@ -17,7 +17,7 @@ class TestRotationInvariance(unittest.TestCase):
 
         self.nn = VN_DGCNN_partseg(in_channels=3, out_features=2, k=10, dropout=0.5, pooling='mean', num_class=self.num_classes)
         self.nn.eval()
-        train_dataset = PartNormalDataset(root=path, npoints=256, split='train', class_choice='Airplane')
+        train_dataset = ShapeNetDataset(root=path, npoints=256, split='train', class_choice='Airplane')
         train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=1, drop_last=True)
 
         # getting one sample from training set
