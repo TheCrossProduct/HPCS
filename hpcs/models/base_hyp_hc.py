@@ -96,10 +96,9 @@ class BaseSimilarityHypHC(pl.LightningModule):
 
         if testing:
             linkage_matrix = []
-            if self.use_hc_loss:
-                for object_idx in range(points.size(0)):
-                    Z = self._decode_linkage(x_poincare[object_idx])
-                    linkage_matrix.append(Z)
+            for object_idx in range(points.size(0)):
+                Z = self._decode_linkage(x_poincare[object_idx])
+                linkage_matrix.append(Z)
             return losses, x_euclidean, x_poincare, linkage_matrix, points, pts_labels
         else:
             return losses
