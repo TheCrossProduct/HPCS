@@ -47,7 +47,7 @@ def ptransp(x, y, u):
     return gyration(y, -x, u) * lx / ly
 
 
-def expmap0(u, p):
+def expmap_1(u, p):
     u_norm = u.norm(dim=-1, p=2, keepdim=True).clamp_min(MIN_NORM)
     second_term = tanh(lambda_(p) * u_norm / 2) * u / u_norm
     gamma_1 = mobius_add(p, second_term)

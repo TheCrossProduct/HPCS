@@ -1,12 +1,20 @@
 import torch
 import torch.nn as nn
+from hpcs.nn import MLP
+from hpcs.utils.poincare import expmap_1
 
 class ExpMap(nn.Module):
-    def __init__(self, in_channels, out_features, scale):
+    def __init__(self):
         super(ExpMap, self).__init__()
-        self.in_channels = in_channels
-        self.out_features = out_features
-        self.scale = nn.Parameter(torch.Tensor([scale]))
+    def forward(self, x):
+        return expmap_1(x, torch.zeros_like(x))
+
+
+class MLPExpMap(nn.Module):
+    def __init__(self, input_feat: int, out_feat: int, negative_slope: float = 0.2, dropout: float = 0.0):
+        super(MLPExpMap, self).__init__()
+        self.mlp = MLP([input_feat, out_feat], negative_slope=negative_slope, dropout=dropout)
 
     def forward(self, x):
-        raise NotImplemented
+        x = self.mlp(x)
+        return expmap_1(x, torch.zeros_like(x))
