@@ -35,45 +35,32 @@ def plot_cloud(xyz,
                clim=None):
     """
     Helper functions
-
     Parameters
     ----------
     xyz: ndarray
         input point cloud
-
     scalars: ndarray
         array to use for coloring point cloud
-
     color:
         color to assign to all points
-
     cmap: matplotlib colormap
         matplotlib colormap to use
-
     point_size: float
         size of points in the plot
-
     graph: csr_matrix
         adjacent matrix representing a graph. The matrix columns and rows must the same of the number of points
-
     rgb: bool
         If True, it consider scalar values as RGB colors
-
     add_scalarbar: bool
         if True it adds a scalarbar in the plot
-
     interact: bool
         if true is possible to pick and select point during the plot
-
     notebook: bool
         set to True if plotting inside a jupyter notebook
-
     title: str
         plot title
-
     clim: list
         interval for color bar
-
     Returns
     -------
     plotter: pv.Plotter
@@ -139,13 +126,10 @@ def color_bool_labeling(y_true, y_pred, pos_label=1, rgb=True):
     ----------
     y_true: ndarray
         ground truth label
-
     y_pred: ndarray
         predicted labels
-
     pos_label: int
         Positive label value
-
     rgb: bool
         if True it returns rgb colors otherwise the points are coloured using grayscale color-bar.
     """
@@ -182,7 +166,6 @@ def lighten_color(color_list, amount=0.25):
     """
     Lightens the given color by multiplying (1-luminosity) by the given amount.
     Input can be matplotlib color string, hex string, or RGB tuple.
-
     Examples:
     >> lighten_color('g', 0.3)
     >> lighten_color('#F034A3', 0.6)
@@ -395,30 +378,22 @@ def plot_confusion_matrix(cm, classes,
     """
     This function prints and plots the confusion matrix.
     Normalization can be applied by setting `normalize=True`.
-
     Parameters
     ----------
     cm: ndarray
         input confusion matrix
-
     classes: list
         list of classes to use as xticks and yticks in the plot
-
     normalize: bool
         if true normalise confusion before plotting it
-
     title: str
         title in the plot
-
     cmap: plt.cm
         colormap to use
-
     figsize: tuple
         size of the figure
-
     savefig: str
         filename to give if you want to save the figure
-
     """
     plt.style.use('ggplot')
     font = {

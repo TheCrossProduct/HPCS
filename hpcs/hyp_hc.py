@@ -10,7 +10,7 @@ from pytorch3d.transforms import RotateAxisAngle, Rotate, random_rotations
 
 from hpcs.optim import RAdam
 from hpcs.distances.poincare import project
-from hpcs.loss.ultrametric_loss import TripletHyperbolicLoss
+from hpcs.loss.ultrametric_loss import MetricHyperbolicLoss
 from hpcs.utils.viz import plot_hyperbolic_eval
 from hpcs.utils.scores import get_optimal_k
 from hpcs.distances.poincare import mobius_add
@@ -67,7 +67,7 @@ class SimilarityHypHC(pl.LightningModule):
     def __init__(self, nn: torch.nn.Module, model_name: str = 'vn_dgcnn_partseg', train_rotation: str = 'so3', test_rotation: str = 'so3',
                  dataset: str = 'shapenet', lr: float = 1e-3, embedding: int = 6, k: int = 10, margin: float = 1.0, t_per_anchor: int = 50,
                  fraction: float = 1.2, temperature: float = 0.05, anneal_factor: float = 0.5, anneal_step: int = 0, num_class: int = 4,
-                 normalize: bool = False, class_vector: bool = False, trade_off: float = 0.1, hierarchical: bool = False):
+                 normalize: bool = False, class_vector: bool = False, trade_off: float = 0.1, hierarchical: bool = False, hierarchy_list: list = []):
         super(SimilarityHypHC, self).__init__()
         self.save_hyperparameters()
         self.model = nn
@@ -89,13 +89,14 @@ class SimilarityHypHC(pl.LightningModule):
         self.class_vector = class_vector
         self.trade_off = trade_off
         self.hierarchical = hierarchical
+        self.hierarchy_list = hierarchy_list
 
         if self.normalize:
             self.scale = torch.nn.Parameter(torch.Tensor([0.99]), requires_grad=True)
         else:
             self.scale = torch.Tensor([0.99])
 
-        self.triplet_loss = TripletHyperbolicLoss(margin=self.margin,
+        self.triplet_loss = MetricHyperbolicLoss(margin=self.margin,
                                                   t_per_anchor=self.t_per_anchor,
                                                   fraction=self.fraction,
                                                   scale=self.scale,
@@ -103,7 +104,8 @@ class SimilarityHypHC(pl.LightningModule):
                                                   anneal_factor=self.anneal_factor,
                                                   normalize=self.normalize,
                                                   num_class=self.num_class,
-                                                  embedding=self.embedding)
+                                                  embedding=self.embedding,
+                                                  hierarchy_list=self.hierarchy_list)
 
     def _decode_linkage(self, leaves_embeddings):
         """Build linkage matrix from leaves' embeddings. Assume points are normalized to same radius."""
@@ -150,41 +152,21 @@ class SimilarityHypHC(pl.LightningModule):
             num_categories = self.num_class
             decode_vector = to_categorical(label, num_categories)
 
-
         scale = self.scale.to(points.device)
         x_embedding = self.model(points, decode_vector, scale)
         x_poincare = x_embedding
 
         x_poincare_reshape = x_poincare.contiguous().view(-1, self.embedding)
 
-        if not self.hierarchical:
-            targets_reshape = targets.view(-1, 1)[:, 0]
+        targets_reshape = targets.view(-1, 1)[:, 0]
 
-            losses = self.triplet_loss.compute_loss(embeddings=x_poincare_reshape,
-                                                    labels=targets_reshape,
-                                                    )
+        losses = self.triplet_loss.compute_loss(embeddings=x_poincare_reshape,
+                                                labels=targets_reshape,
+                                                )
 
-            total_loss_triplet = losses['loss_sim']['losses']
-            total_loss_hyphc = losses['loss_lca']['losses']
-            total_loss_hyphc = total_loss_hyphc * self.trade_off
-        else:
-            loss_triplet_list = []
-            loss_hyphc_list = []
-            for i in range(3):
-                targets_reshape = targets[i].view(-1, 1)[:, 0]
-
-                losses = self.triplet_loss.compute_loss(embeddings=x_poincare_reshape,
-                                                        labels=targets_reshape,
-                                                        )
-
-                loss_triplet = losses['loss_sim']['losses']
-                loss_hyphc = losses['loss_lca']['losses']
-                loss_hyphc = loss_hyphc * self.trade_off
-
-                loss_triplet_list.append(loss_triplet)
-                loss_hyphc_list.append(loss_hyphc)
-            total_loss_triplet = sum(loss_triplet_list)
-            total_loss_hyphc = sum(loss_hyphc_list)
+        total_loss_triplet = losses['loss_sim']['losses']
+        total_loss_hyphc = losses['loss_lca']['losses']
+        total_loss_hyphc = total_loss_hyphc * self.trade_off
 
         if testing:
             linkage_matrix = []
@@ -236,9 +218,6 @@ class SimilarityHypHC(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         test_loss_triplet, test_loss_hyphc, x_embedding, x_poincare, linkage_matrix, points, targets = self.forward(batch, testing=True)
         test_loss = test_loss_triplet + test_loss_hyphc
-
-        if self.hierarchical:
-            targets = targets[2]
 
         indexes = []
         for object_idx in range(points.size(0)):

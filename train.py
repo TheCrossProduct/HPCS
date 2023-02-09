@@ -5,18 +5,20 @@ import os.path as osp
 import torch
 from collections import OrderedDict
 from torch.utils.data import DataLoader
-from hpcs.data import PartNetDataset, PartNetDatasetHierarchical, ShapeNetDataset
+from hpcs.data import PartNetDataset, ShapeNetDataset
+from hpcs.data.hierarchy_list import get_hierarchy_list
 
 import wandb
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping,LearningRateMonitor
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 
 from hpcs.models import ShapeNetHypHC, PartNetHypHC
 from hpcs.nn.dgcnn import DGCNN_partseg, VN_DGCNN_partseg
 
 from hpcs.nn.pointnet import POINTNET_partseg, VN_POINTNET_partseg
 from hpcs.nn.hyperbolic import ExpMap
+
 
 def read_configutation():
     parser = argparse.ArgumentParser()
@@ -43,17 +45,18 @@ def read_configutation():
     parser.add_argument('--anneal_factor', '-anneal_factor', default=2, type=float, help='annealing factor')
     parser.add_argument('--anneal_step', '-anneal_step', default=0, type=int, help='use annealing each n step')
     parser.add_argument('--patience', '-patience', default=50, type=int, help='patience value for early stopping')
-    parser.add_argument('--normalize', '-normalize', default=True, type=bool, help='normalize hyperbolic space')
-    parser.add_argument('--class_vector', '-class_vector', default=False, type=bool, help='class vector to decode')
     parser.add_argument('--trade_off', '-trade_off', default=0.5, type=float, help='control trade-off between two losses')
+    parser.add_argument('--metric_learning', '-metric_learning', default=True, type=bool, help='learn similarities between points')
+    parser.add_argument('--cosface', '-cosface', default=True, type=bool, help='cosface / triplet loss')
+    parser.add_argument('--class_vector', '-class_vector', default=False, type=bool, help='class vector to decode')
     parser.add_argument('--hierarchical', '-hierarchical', default=False, type=bool, help='hierarchical loss')
+    parser.add_argument('--hierarchy_list', '-hierarchy_list', default=[], type=list, help='precomputed hierarchy list')
+    parser.add_argument('--plot_inference', '-plot_inference', default=False, type=bool, help='plot visualizations during testing')
     parser.add_argument('--pretrained', '-pretrained', default=False, type=bool, help='load pretrained model')
     parser.add_argument('--resume', '-resume', default=False, type=bool, help='resume training on model')
-    parser.add_argument('--wandb','-wandb',default='online', type=str, help='Online/Offline WandB mode (Useful in JeanZay)')
+    parser.add_argument('--wandb', '-wandb', default='online', type=str, help='Online/Offline WandB mode (Useful in JeanZay)')
     args = parser.parse_args()
     return args
-
-
 
 
 def configure_feature_extractor(model_name, embedding_size, num_class, k, dropout, pretrained):
@@ -61,8 +64,7 @@ def configure_feature_extractor(model_name, embedding_size, num_class, k, dropou
     if model_name == 'dgcnn_partseg':
         nn = DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout, num_class=num_class)
     elif model_name == 'vn_dgcnn_partseg':
-        nn = VN_DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean',
-                              num_class=num_class)
+        nn = VN_DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean', num_class=num_class)
     elif model_name == 'pointnet_partseg':
         nn = POINTNET_partseg(num_part=out_features, normal_channel=False)
     elif model_name == 'vn_pointnet_partseg':
@@ -78,12 +80,13 @@ def configure_feature_extractor(model_name, embedding_size, num_class, k, dropou
             name = key.replace('module.', '')
             new_state_dict[name] = value
         nn.load_state_dict(new_state_dict, strict=False)
-
     return nn
+
 
 def configure_embedder(embedder_name, input_features, output_features, radius):
     nn = ExpMap()
     return nn
+
 
 def configure(args):
     wandb.config.update(args)
@@ -110,75 +113,59 @@ def configure(args):
     anneal_factor = args.anneal_factor
     anneal_step = args.anneal_step
     patience = args.patience
-    normalize = args.normalize
-    class_vector = args.class_vector
     trade_off = args.trade_off
+    metric_learning = args.metric_learning
+    cosface = args.cosface
+    class_vector = args.class_vector
     hierarchical = args.hierarchical
+    hierarchy_list = args.hierarchy_list
+    plot_inference = args.plot_inference
     pretrained = args.pretrained
     resume = args.resume
-    wandb_mode=args.wandb
-
-
+    wandb_mode = args.wandb
 
     if dataset == 'shapenet':
         data_folder = 'data/ShapeNet/raw'
-        #data_folder = '/gpfsscratch/rech/qpj/uyn98cq/ShapeNet/raw'
+        # data_folder = '/gpfsscratch/rech/qpj/uyn98cq/ShapeNet/raw'
         train_dataset = ShapeNetDataset(root=data_folder, npoints=fixed_points, split='train', class_choice=category)
         valid_dataset = ShapeNetDataset(root=data_folder, npoints=fixed_points, split='val', class_choice=category)
-        test_dataset = ShapeNetDataset(root=data_folder, npoints=0, split='test', class_choice=category)
-
-        train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers, drop_last=True)
-        valid_loader = DataLoader(valid_dataset, batch_size=batch, shuffle=False, num_workers=num_workers, drop_last=True)
+        test_dataset = ShapeNetDataset(root=data_folder, npoints=fixed_points, split='test', class_choice=category)
 
         if class_vector:
             num_class = len(train_dataset.seg_classes[category])
         else:
-            num_class = len(train_dataset.seg_classes[category])
+            num_class = 16
 
     elif dataset == 'partnet':
         data_folder = 'data/PartNet/sem_seg_h5/'
 
         if hierarchical:
-            train_paths = []
-            val_paths = []
-            test_paths = []
+            levels = []
             for i in range(3):
-                list_train = os.path.join(data_folder, '%s-%d' % (category, i+1), 'train_files.txt')
-                list_val = os.path.join(data_folder, '%s-%d' % (category, i+1), 'val_files.txt')
-                list_test = os.path.join(data_folder, '%s-%d' % (category, i+1), 'test_files.txt')
-                train_paths.append(list_train)
-                val_paths.append(list_val)
-                test_paths.append(list_test)
+                list_train = os.path.join(data_folder, '%s-%d' % (category, i + 1), 'train_files.txt')
+                if os.path.exists(list_train):
+                    levels.append(i)
+            level = levels[-1]
+            hierarchy_list = get_hierarchy_list(category, levels)
 
-            train_dataset = PartNetDatasetHierarchical(train_paths, fixed_points, i+1)
-            val_dataset = PartNetDatasetHierarchical(val_paths, fixed_points, i+1)
+        list_train = os.path.join(data_folder, '%s-%d' % (category, level), 'train_files.txt')
+        list_val = os.path.join(data_folder, '%s-%d' % (category, level), 'val_files.txt')
+        list_test = os.path.join(data_folder, '%s-%d' % (category, level), 'test_files.txt')
 
-            with open('data/PartNet/after_merging_label_ids/%s-level-%d.txt' % (category, 3), 'r') as fin:
-                num_class = len(fin.readlines()) + 1
-                print('Number of Classes: %d' % num_class)
-            if not class_vector:
-                num_class = 16
-        else:
-            list_train = os.path.join(data_folder, '%s-%d' % (category, level), 'train_files.txt')
-            list_val = os.path.join(data_folder, '%s-%d' % (category, level), 'val_files.txt')
-            list_test = os.path.join(data_folder, '%s-%d' % (category, level), 'test_files.txt')
+        train_dataset = PartNetDataset(list_train, fixed_points)
+        valid_dataset = PartNetDataset(list_val, fixed_points)
+        test_dataset = PartNetDataset(list_test, fixed_points)
 
-            train_dataset = PartNetDataset(list_train, fixed_points)
-            val_dataset = PartNetDataset(list_val, fixed_points)
-            test_dataset = PartNetDataset(list_test, fixed_points)
+        with open('data/PartNet/after_merging_label_ids/%s-level-%d.txt' % (category, level), 'r') as fin:
+            num_class = len(fin.readlines()) + 1
+            print('Number of Classes: %d' % num_class)
 
-            with open('data/PartNet/after_merging_label_ids/%s-level-%d.txt' % (category, level), 'r') as fin:
-                num_class = len(fin.readlines()) + 1
-                print('Number of Classes: %d' % num_class)
-            if not class_vector:
-                num_class = 16
-
-
-
-        train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers, drop_last=True)
-        valid_loader = DataLoader(val_dataset, batch_size=batch, shuffle=False, num_workers=num_workers, drop_last=True)
     else:
         raise KeyError(f"Not available implementation for dataset: {dataset}")
+
+    train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers, drop_last=True)
+    valid_loader = DataLoader(valid_dataset, batch_size=batch, shuffle=False, num_workers=num_workers, drop_last=True)
+    test_loader = DataLoader(test_dataset, batch_size=batch, shuffle=False, num_workers=num_workers, drop_last=True)
 
     nn_feat = configure_feature_extractor(model_name=model_name,
                                           embedding_size=embedding,
@@ -202,7 +189,12 @@ def configure(args):
                               anneal_step=anneal_step,
                               num_class=num_class,
                               class_vector=class_vector,
-                              trade_off=trade_off)
+                              trade_off=trade_off,
+                              metric_learning=metric_learning,
+                              cosface=cosface,
+                              hierarchical=hierarchical,
+                              hierarchy_list=hierarchy_list,
+                              plot_inference=plot_inference)
     elif dataset == 'partnet':
         model = PartNetHypHC(nn_feat=nn_feat,
                              nn_emb=nn_emb,
@@ -218,7 +210,12 @@ def configure(args):
                              anneal_step=anneal_step,
                              num_class=num_class,
                              class_vector=class_vector,
-                             trade_off=trade_off)
+                             trade_off=trade_off,
+                             metric_learning=metric_learning,
+                             cosface=cosface,
+                             hierarchical=hierarchical,
+                             hierarchy_list=hierarchy_list,
+                             plot_inference=plot_inference)
     else:
         raise KeyError(f"Not available implementation for dataset: {dataset}")
 
@@ -240,7 +237,6 @@ def configure(args):
                     'accelerator': accelerator}
     print(model_params)
 
-
     savedir = os.path.join(logger.save_dir, logger.name, 'version_' + str(logger.version), 'checkpoints')
     checkpoint_callback = ModelCheckpoint(dirpath=savedir, verbose=True)
     early_stop_callback = EarlyStopping(
@@ -250,7 +246,7 @@ def configure(args):
         verbose=True,
         mode='min')
     lr_monitor = LearningRateMonitor(logging_interval='step')
-    
+
     trainer = pl.Trainer(accelerator=accelerator,
                          max_epochs=epochs,
                          callbacks=[early_stop_callback, checkpoint_callback, lr_monitor],
@@ -258,11 +254,10 @@ def configure(args):
                          limit_test_batches=10
                          )
 
-    return model, trainer, train_loader, valid_loader, resume, wandb_mode
+    return model, trainer, train_loader, valid_loader, test_loader, resume, wandb_mode
 
 
-def train(model, trainer, train_loader, valid_loader, resume):
-
+def train(model, trainer, train_loader, valid_loader, test_loader, resume):
     if os.path.exists('model.ckpt'):
         os.remove('model.ckpt')
 
@@ -277,9 +272,11 @@ def train(model, trainer, train_loader, valid_loader, resume):
     trainer.save_checkpoint('model.ckpt')
     wandb.save('model.ckpt')
 
+    # trainer.test(model, test_loader)
+
 
 if __name__ == "__main__":
-    args=read_configutation()
+    args = read_configutation()
     wandb.init(project='HPCS', mode=args.wandb)
-    model, trainer, train_loader, valid_loader, resume, wandb_mode = configure(args)
-    train(model, trainer, train_loader, valid_loader, resume)
+    model, trainer, train_loader, valid_loader, test_loader, resume, wandb_mode = configure(args)
+    train(model, trainer, train_loader, valid_loader, test_loader, resume)

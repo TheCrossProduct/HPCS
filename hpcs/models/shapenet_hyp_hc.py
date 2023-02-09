@@ -20,9 +20,12 @@ class ShapeNetHypHC(BaseSimilarityHypHC):
                  anneal_step: int = 0,
                  num_class: int = 4,
                  trade_off: float = 0.1,
-                 plot_inference: bool = False,
-                 use_hc_loss: bool = True,
                  radius: float = 1.0,
+                 metric_learning: bool = True,
+                 cosface: bool = True,
+                 hierarchical: bool = False,
+                 hierarchy_list: list = [],
+                 plot_inference: bool = False,
                  train_rotation: str = 'so3',
                  test_rotation: str = 'so3',
                  class_vector: bool = False):
@@ -38,9 +41,12 @@ class ShapeNetHypHC(BaseSimilarityHypHC):
                                             anneal_step=anneal_step,
                                             num_class=num_class,
                                             trade_off=trade_off,
-                                            plot_inference=plot_inference,
-                                            use_hc_loss=use_hc_loss,
-                                            radius=radius)
+                                            radius=radius,
+                                            metric_learning=metric_learning,
+                                            cosface=cosface,
+                                            hierarchical=hierarchical,
+                                            hierarchy_list=hierarchy_list,
+                                            plot_inference=plot_inference)
 
         self.train_rotation = train_rotation
         self.test_rotation = test_rotation
@@ -63,7 +69,7 @@ class ShapeNetHypHC(BaseSimilarityHypHC):
             points = trot.transform_points(points.cpu())
 
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        points, label, targets = points.float().to(device), label.long().to(device), targets
+        points, label, targets = points.float().to(device), label.long().to(device), targets.long().to(device)
         points = points.transpose(2, 1)
 
         if self.class_vector:

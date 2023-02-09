@@ -7,12 +7,11 @@ import pytorch_lightning as pl
 from torch.nn import functional as F
 from torch.optim import lr_scheduler
 
-from pytorch_metric_learning.losses import CosFaceLoss
-
 from scipy.cluster.hierarchy import linkage
 
 from hpcs.optim import RAdam
 from hpcs.distances.poincare import project
+from hpcs.loss.ultrametric_loss import MetricHyperbolicLoss
 from hpcs.loss.ultrametric_loss import HyperbolicHCLoss
 from hpcs.utils.viz import plot_hyperbolic_eval
 from hpcs.utils.scores import get_optimal_k
@@ -31,9 +30,12 @@ class BaseSimilarityHypHC(pl.LightningModule):
                  anneal_step: int = 0,
                  num_class: int = 4,
                  trade_off: float = 0.1,
-                 plot_inference: bool = False,
-                 use_hc_loss: bool = True,
-                 radius: float = 1.0):
+                 radius: float = 1.0,
+                 metric_learning: bool = True,
+                 cosface: bool = True,
+                 hierarchical: bool = False,
+                 hierarchy_list: list = [],
+                 plot_inference: bool = False):
 
         super(BaseSimilarityHypHC, self).__init__()
         self.save_hyperparameters()
@@ -49,36 +51,51 @@ class BaseSimilarityHypHC(pl.LightningModule):
         self.anneal_step = anneal_step
         self.num_class = num_class
         self.trade_off = trade_off
-        self.plot_inference = plot_inference
-        self.use_hc_loss = use_hc_loss
         self.radius = radius
+        self.metric_learning = metric_learning
+        self.cosface = cosface
+        self.hierarchical = hierarchical
+        self.hierarchy_list = hierarchy_list
+        self.plot_inference = plot_inference
 
-        if self.use_hc_loss:
+        if self.metric_learning:
+            self.scale = torch.tensor([self.radius - 5e-2])
+            self.metric_hyp_loss = MetricHyperbolicLoss(margin=self.margin,
+                                                        t_per_anchor=self.t_per_anchor,
+                                                        fraction=self.fraction,
+                                                        scale=self.scale,
+                                                        temperature=self.temperature,
+                                                        anneal_factor=self.anneal_factor,
+                                                        num_class=self.num_class,
+                                                        embedding=self.embedding,
+                                                        cosface=self.cosface,
+                                                        hierarchical=self.hierarchical,
+                                                        hierarchy_list=self.hierarchy_list)
+        else:
             self.scale = torch.nn.Parameter(torch.Tensor([1e-3]), requires_grad=True)
             self.hyp_loss = HyperbolicHCLoss(temperature=self.temperature, t_per_anchor=self.t_per_anchor, distance='cosine')
-        else:
-            self.scale = torch.tensor([self.radius - 5e-2])
-
-        self.cos_face_loss = CosFaceLoss(num_classes=self.num_class, embedding_size=self.embedding, margin=0.35, scale=64)
 
 
     def _decode_linkage(self, leaves_embeddings):
         """Build linkage matrix from leaves' embeddings. Assume points are normalized to same radius."""
-
+        leaves_embeddings = self.metric_hyp_loss.normalize_embeddings(leaves_embeddings)
         leaves_embeddings = project(leaves_embeddings).detach().cpu()
         Z = linkage(leaves_embeddings, method='ward', metric='euclidean')
         return Z
 
     def compute_losses(self, x_euclidean, x_poincare, labels):
+        labels = labels.view(-1, 1)[:, 0]
         losses = {}
-        if self.use_hc_loss:
-            loss = self.hyp_loss.compute_loss(x_poincare, self.scale)
-            losses['loss_lca'] = loss['loss_lca']['losses'] * self.trade_off
-        if self.nn_emb is not None:
-            losses['loss_cos_face'] = self.cos_face_loss(x_poincare, labels.long())
+        if self.metric_learning:
+            if self.nn_emb is not None:
+                loss = self.metric_hyp_loss.compute_loss(x_poincare, labels.long())
+                losses['loss_metric'] = loss['loss_metric']['losses']
+            else:
+                loss = self.metric_hyp_loss.compute_loss(x_euclidean, labels.long())
+                losses['loss_metric'] = loss['loss_metric']['losses']
         else:
-            losses['loss_cos_face'] = self.cos_face_loss(x_euclidean, labels.long())
-
+            loss = self.hyp_loss.compute_loss(x_poincare, self.scale)
+            losses['loss_hyp'] = loss['loss_hyp']['losses'] * self.trade_off
         return losses
 
     def _forward(self, batch, testing: bool):
@@ -130,7 +147,7 @@ class BaseSimilarityHypHC(pl.LightningModule):
     def training_epoch_end(self, outputs):
         if self.current_epoch and self.anneal_step > 0 and self.current_epoch % self.anneal_step == 0:
             print(f"Annealing temperature at the end of epoch {self.current_epoch}")
-            self.temperature = self.hyp_loss.anneal_temperature()
+            self.temperature = self.metric_hyp_loss.anneal_temperature()
             print("Temperature Value: ", self.temperature)
 
     def validation_step(self, batch, batch_idx):
@@ -144,25 +161,20 @@ class BaseSimilarityHypHC(pl.LightningModule):
         test_losses, x_euclidean, x_poincare, linkage_matrix, points, targets = self.forward(batch, testing=True)
         test_loss = self.sum_losses(test_losses)
 
-        if self.hierarchical:
-            targets = targets[2]
-
         indexes = []
         for object_idx in range(points.size(0)):
-            best_pred, best_k, best_score = get_optimal_k(targets[object_idx].cpu(), linkage_matrix[object_idx], 'iou')
-
+            best_pred, best_k, best_score = get_optimal_k(targets[object_idx], linkage_matrix[object_idx], 'iou')
             if self.plot_inference:
-                if self.use_hc_loss:
-                    emb_poincare = self.hyp_loss.normalize_embeddings(x_poincare[object_idx], self.scale)
-                    plot_hyperbolic_eval(x=points[object_idx].T.cpu(),
-                                         y=targets[object_idx].cpu(),
-                                         y_pred=best_pred,
-                                         emb_hidden=x_euclidean[object_idx].cpu(),
-                                         emb_poincare=emb_poincare.cpu(),
-                                         linkage_matrix=linkage_matrix[object_idx],
-                                         k=best_k,
-                                         score=best_score,
-                                         show=True)
+                emb_poincare = self.metric_hyp_loss.normalize_embeddings(x_poincare[object_idx])
+                plot_hyperbolic_eval(x=points[object_idx].T.cpu(),
+                                     y=targets[object_idx].cpu(),
+                                     y_pred=best_pred,
+                                     emb_hidden=x_euclidean[object_idx].cpu(),
+                                     emb_poincare=emb_poincare.cpu(),
+                                     linkage_matrix=linkage_matrix[object_idx],
+                                     k=best_k,
+                                     score=best_score,
+                                     show=True)
 
             indexes.append(best_score)
         score = torch.mean(torch.tensor(indexes))

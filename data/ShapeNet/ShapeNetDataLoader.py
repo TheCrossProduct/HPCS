@@ -107,7 +107,7 @@ class PartNormalDataset(Dataset):
                 self.cache[index] = (point_set, cls, seg)
         point_set[:, 0:3] = pc_normalize(point_set[:, 0:3])
 
-        if self.npoints>0:
+        if self.npoints > 0:
             choice = np.random.choice(len(seg), self.npoints, replace=True)
             # resample
             point_set = point_set[choice, :]

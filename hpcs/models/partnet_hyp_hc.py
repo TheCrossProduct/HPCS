@@ -20,31 +20,39 @@ class PartNetHypHC(BaseSimilarityHypHC):
                  anneal_step: int = 0,
                  num_class: int = 4,
                  trade_off: float = 0.1,
-                 plot_inference: bool = False,
-                 use_hc_loss: bool = True,
                  radius: float = 1.0,
+                 metric_learning: bool = True,
+                 cosface: bool = True,
+                 hierarchical: bool = False,
+                 hierarchy_list: list = [],
+                 plot_inference: bool = False,
                  train_rotation: str = 'so3',
                  test_rotation: str = 'so3',
                  class_vector: bool = False):
         super(PartNetHypHC, self).__init__(nn_feat=nn_feat,
-                                            nn_emb=nn_emb,
-                                            lr=lr,
-                                            embedding=embedding,
-                                            margin=margin,
-                                            t_per_anchor=t_per_anchor,
-                                            fraction=fraction,
-                                            temperature=temperature,
-                                            anneal_factor=anneal_factor,
-                                            anneal_step=anneal_step,
-                                            num_class=num_class,
-                                            trade_off=trade_off,
-                                            plot_inference=plot_inference,
-                                            use_hc_loss=use_hc_loss,
-                                            radius=radius)
+                                           nn_emb=nn_emb,
+                                           lr=lr,
+                                           embedding=embedding,
+                                           margin=margin,
+                                           t_per_anchor=t_per_anchor,
+                                           fraction=fraction,
+                                           temperature=temperature,
+                                           anneal_factor=anneal_factor,
+                                           anneal_step=anneal_step,
+                                           num_class=num_class,
+                                           trade_off=trade_off,
+                                           radius=radius,
+                                           metric_learning=metric_learning,
+                                           cosface=cosface,
+                                           hierarchical=hierarchical,
+                                           hierarchy_list=hierarchy_list,
+                                           plot_inference=plot_inference)
 
         self.train_rotation = train_rotation
         self.test_rotation = test_rotation
         self.class_vector = class_vector
+        self.hierarchical = hierarchical
+        self.hierarchy_list = hierarchy_list
 
     def _forward(self, batch, testing):
         points, targets = batch
@@ -64,7 +72,7 @@ class PartNetHypHC(BaseSimilarityHypHC):
             points = trot.transform_points(points.cpu())
 
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        points, label, targets = points.float().to(device), label.long().to(device), targets
+        points, label, targets = points.float().to(device), label.long().to(device), targets.long().to(device)
         points = points.transpose(2, 1)
 
         if self.class_vector:
@@ -87,6 +95,3 @@ class PartNetHypHC(BaseSimilarityHypHC):
             x_poincare = None
 
         return points, x_euclidean, x_poincare, targets
-
-    def compute_losses(self, x_euclidean, x_poincare, labels):
-        raise NotImplemented

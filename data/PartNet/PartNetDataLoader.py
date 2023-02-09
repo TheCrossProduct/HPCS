@@ -35,10 +35,14 @@ class H5Dataset(Dataset):
     def __getitem__(self, index):
         points, data_num, label_seg = self.points[index], self.data_num[index], self.label_seg[index]
         points[:, 0:3] = pc_normalize(points[:, 0:3])
-        choice = np.random.choice(len(label_seg), self.npoints, replace=True)
-        point_set = points[choice, :]
-        label_seg_set = label_seg[choice]
-        return point_set.astype(np.float32), label_seg_set.astype(np.int64)
+        if self.npoints > 0:
+            choice = np.random.choice(len(label_seg), self.npoints, replace=True)
+            point_set = points[choice, :]
+            label_seg_set = label_seg[choice]
+            return point_set.astype(np.float32), label_seg_set.astype(np.int64)
+        else:
+            return points, label_seg
+
 
     def __len__(self):
         return self.points.shape[0]
