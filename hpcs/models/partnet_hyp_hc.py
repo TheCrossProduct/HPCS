@@ -87,3 +87,6 @@ class PartNetHypHC(BaseSimilarityHypHC):
             x_poincare = None
 
         return points, x_euclidean, x_poincare, targets
+
+    def compute_losses(self, x_euclidean, x_poincare, labels):
+        raise NotImplemented
