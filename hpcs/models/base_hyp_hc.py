@@ -109,7 +109,8 @@ class BaseSimilarityHypHC(pl.LightningModule):
 
     def forward(self, batch, testing: bool = False):
         points, x_euclidean, x_poincare, pts_labels = self._forward(batch, testing)
-        losses = self.compute_losses(x_euclidean, x_poincare, pts_labels)
+        x_poincare_reshape = x_poincare.contiguous().view(-1, self.embedding)
+        losses = self.compute_losses(x_euclidean, x_poincare_reshape, pts_labels)
 
         if testing:
             linkage_matrix = []
@@ -163,7 +164,7 @@ class BaseSimilarityHypHC(pl.LightningModule):
 
         indexes = []
         for object_idx in range(points.size(0)):
-            best_pred, best_k, best_score = get_optimal_k(targets[object_idx], linkage_matrix[object_idx], 'iou')
+            best_pred, best_k, best_score = get_optimal_k(targets[object_idx].cpu(), linkage_matrix[object_idx], 'iou')
             if self.plot_inference:
                 emb_poincare = self.metric_hyp_loss.normalize_embeddings(x_poincare[object_idx])
                 plot_hyperbolic_eval(x=points[object_idx].T.cpu(),

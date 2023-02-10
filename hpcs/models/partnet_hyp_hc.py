@@ -90,7 +90,6 @@ class PartNetHypHC(BaseSimilarityHypHC):
         x_euclidean = self.nn_feat(points, decode_vector)
         if self.nn_emb:
             x_poincare = self.nn_emb(x_euclidean)
-            x_poincare = x_poincare.contiguous().view(-1, self.embedding)
         else:
             x_poincare = None
 

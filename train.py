@@ -272,7 +272,7 @@ def train(model, trainer, train_loader, valid_loader, test_loader, resume):
     trainer.save_checkpoint('model.ckpt')
     wandb.save('model.ckpt')
 
-    # trainer.test(model, test_loader)
+    trainer.test(model, test_loader)
 
 
 if __name__ == "__main__":
