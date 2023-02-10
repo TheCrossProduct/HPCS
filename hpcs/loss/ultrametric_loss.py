@@ -6,7 +6,7 @@ from torch.nn import functional as F
 from pytorch_metric_learning.losses import BaseMetricLossFunction, TripletMarginLoss
 from pytorch_metric_learning.losses import CosFaceLoss
 
-from hpcs.loss.hierarchical_loss.hierarchical_cosface_loss import HierarchicalCosFaceLoss
+from hpcs.loss.hierarchical_cosface_loss import HierarchicalCosFaceLoss
 from hpcs.miner.triplet_margin_miner import RandomTripletMarginMiner
 from hpcs.miner.triplet_margin_loss import TripletMarginLoss
 
@@ -40,7 +40,7 @@ class MetricHyperbolicLoss(BaseMetricLossFunction):
 
         if self.cosface:
             if self.hierarchical:
-                self.loss_cosface = HierarchicalCosFaceLoss(num_classes=self.num_class, embedding_size=self.embedding, hierarchy_list=self.hierarchy_list, margin=0.35, scale=64)
+                self.loss_cosface_hier = HierarchicalCosFaceLoss(num_classes=self.num_class, embedding_size=self.embedding, margin=0.35, scale=64, hierarchy_list=self.hierarchy_list)
             else:
                 self.loss_cosface = CosFaceLoss(num_classes=self.num_class, embedding_size=self.embedding, margin=0.35, scale=64)
         else:
@@ -88,7 +88,7 @@ class MetricHyperbolicLoss(BaseMetricLossFunction):
 
         if self.cosface:
             if self.hierarchical:
-                loss_metric = self.loss_cosface(embeddings, labels.long(), self.hierarchy_list)
+                loss_metric = self.loss_cosface_hier(embeddings, labels.long(), self.hierarchy_list)
             else:
                 loss_metric = self.loss_cosface(embeddings, labels.long())
         else:

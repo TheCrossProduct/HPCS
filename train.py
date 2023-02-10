@@ -49,7 +49,7 @@ def read_configutation():
     parser.add_argument('--miner', '-miner', default=True, type=bool, help='triplet miner for hyperbolic loss')
     parser.add_argument('--cosface', '-cosface', default=True, type=bool, help='cosface / triplet loss')
     parser.add_argument('--class_vector', '-class_vector', default=False, type=bool, help='class vector to decode')
-    parser.add_argument('--hierarchical', '-hierarchical', default=False, type=bool, help='hierarchical loss')
+    parser.add_argument('--hierarchical', '-hierarchical', default=True, type=bool, help='hierarchical loss')
     parser.add_argument('--hierarchy_list', '-hierarchy_list', default=[], type=list, help='precomputed hierarchy list')
     parser.add_argument('--plot_inference', '-plot_inference', default=False, type=bool, help='plot visualizations during testing')
     parser.add_argument('--pretrained', '-pretrained', default=False, type=bool, help='load pretrained model')

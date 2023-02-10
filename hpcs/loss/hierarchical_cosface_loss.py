@@ -3,12 +3,12 @@ from torch.nn import functional as F
 
 from pytorch_metric_learning.utils import common_functions as c_f
 from pytorch_metric_learning.utils import loss_and_miner_utils as lmu
-
-from hpcs.loss.hierarchical_loss.large_margin_softmax_loss import LargeMarginSoftmaxLoss
+from pytorch_metric_learning.losses import LargeMarginSoftmaxLoss
 
 
 def hierarchical_loss(probabilities, targets, hierarchy_list):
     loss = 0
+    cross_entropy = torch.nn.CrossEntropyLoss(reduction="none")
     for level_loss_list in hierarchy_list:
         probabilities_tosum = probabilities.clone()
         summed_probabilities = probabilities_tosum
@@ -23,7 +23,7 @@ def hierarchical_loss(probabilities, targets, hierarchy_list):
             for channel in branch:
                 summed_probabilities[:, channel:(channel + 1)] = summed_tree_branch_slice
 
-        level_loss = F.nll_loss(torch.log(summed_probabilities), targets)
+        level_loss = cross_entropy(summed_probabilities, targets)
         loss = loss + level_loss
     return loss
 
@@ -33,8 +33,9 @@ class HierarchicalCosFaceLoss(LargeMarginSoftmaxLoss):
     Implementation of https://arxiv.org/pdf/1801.07698.pdf
     """
 
-    def __init__(self, *args, margin=0.35, scale=64, **kwargs):
+    def __init__(self, *args, margin=0.35, scale=64, hierarchy_list=None, **kwargs):
         super().__init__(*args, margin=margin, scale=scale, **kwargs)
+        self.hierarchy_list = hierarchy_list
 
     def init_margin(self):
         pass
@@ -72,8 +73,7 @@ class HierarchicalCosFaceLoss(LargeMarginSoftmaxLoss):
         logits = cosine + (mask * diff)
         logits = self.scale_logits(logits, embeddings)
 
-        probabilities = F.softmax(logits, dim=1)
-        loss_hier = hierarchical_loss(probabilities, labels, self.hierarchy_list)
+        loss_hier = hierarchical_loss(logits, labels, self.hierarchy_list)
 
         miner_weighted_loss = loss_hier * miner_weights
         loss_dict = {
