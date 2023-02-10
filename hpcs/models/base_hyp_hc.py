@@ -29,6 +29,7 @@ class BaseSimilarityHypHC(pl.LightningModule):
                  anneal_step: int = 0,
                  num_class: int = 4,
                  trade_off: float = 0.1,
+                 miner: bool = True,
                  cosface: bool = True,
                  hierarchical: bool = False,
                  hierarchy_list: list = [],
@@ -48,6 +49,7 @@ class BaseSimilarityHypHC(pl.LightningModule):
         self.anneal_step = anneal_step
         self.num_class = num_class
         self.trade_off = trade_off
+        self.miner = miner
         self.cosface = cosface
         self.hierarchical = hierarchical
         self.hierarchy_list = hierarchy_list
@@ -62,6 +64,7 @@ class BaseSimilarityHypHC(pl.LightningModule):
                                                     anneal_factor=self.anneal_factor,
                                                     num_class=self.num_class,
                                                     embedding=self.embedding,
+                                                    miner=self.miner,
                                                     cosface=self.cosface,
                                                     hierarchical=self.hierarchical,
                                                     hierarchy_list=self.hierarchy_list)

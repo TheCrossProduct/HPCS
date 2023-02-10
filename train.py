@@ -46,7 +46,7 @@ def read_configutation():
     parser.add_argument('--anneal_step', '-anneal_step', default=0, type=int, help='use annealing each n step')
     parser.add_argument('--patience', '-patience', default=50, type=int, help='patience value for early stopping')
     parser.add_argument('--trade_off', '-trade_off', default=0.5, type=float, help='control trade-off between two losses')
-    parser.add_argument('--metric_learning', '-metric_learning', default=True, type=bool, help='learn similarities between points')
+    parser.add_argument('--miner', '-miner', default=True, type=bool, help='triplet miner for hyperbolic loss')
     parser.add_argument('--cosface', '-cosface', default=True, type=bool, help='cosface / triplet loss')
     parser.add_argument('--class_vector', '-class_vector', default=False, type=bool, help='class vector to decode')
     parser.add_argument('--hierarchical', '-hierarchical', default=False, type=bool, help='hierarchical loss')
@@ -114,7 +114,7 @@ def configure(args):
     anneal_step = args.anneal_step
     patience = args.patience
     trade_off = args.trade_off
-    metric_learning = args.metric_learning
+    miner = args.miner
     cosface = args.cosface
     class_vector = args.class_vector
     hierarchical = args.hierarchical
@@ -142,9 +142,9 @@ def configure(args):
         if hierarchical:
             levels = []
             for i in range(3):
-                list_train = os.path.join(data_folder, '%s-%d' % (category, i + 1), 'train_files.txt')
+                list_train = os.path.join(data_folder, '%s-%d' % (category, i+1), 'train_files.txt')
                 if os.path.exists(list_train):
-                    levels.append(i)
+                    levels.append(i+1)
             level = levels[-1]
             hierarchy_list = get_hierarchy_list(category, levels)
 
@@ -190,6 +190,7 @@ def configure(args):
                               num_class=num_class,
                               class_vector=class_vector,
                               trade_off=trade_off,
+                              miner=miner,
                               cosface=cosface,
                               hierarchical=hierarchical,
                               hierarchy_list=hierarchy_list,
@@ -210,6 +211,7 @@ def configure(args):
                              num_class=num_class,
                              class_vector=class_vector,
                              trade_off=trade_off,
+                             miner=miner,
                              cosface=cosface,
                              hierarchical=hierarchical,
                              hierarchy_list=hierarchy_list,
