@@ -6,7 +6,7 @@ from torch.nn import functional as F
 from pytorch_metric_learning.losses import BaseMetricLossFunction, TripletMarginLoss
 from pytorch_metric_learning.losses import CosFaceLoss
 
-from hpcs.loss.hierarchical_cosface_loss import HierarchicalCosFaceLoss
+from hpcs.loss.hierarchical_loss.hierarchical_cosface_loss import HierarchicalCosFaceLoss
 from hpcs.miner.triplet_margin_miner import RandomTripletMarginMiner
 from hpcs.miner.triplet_margin_loss import TripletMarginLoss
 

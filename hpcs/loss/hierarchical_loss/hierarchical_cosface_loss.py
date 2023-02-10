@@ -3,7 +3,8 @@ from torch.nn import functional as F
 
 from pytorch_metric_learning.utils import common_functions as c_f
 from pytorch_metric_learning.utils import loss_and_miner_utils as lmu
-from pytorch_metric_learning.losses import LargeMarginSoftmaxLoss
+
+from hpcs.loss.hierarchical_loss.large_margin_softmax_loss import LargeMarginSoftmaxLoss
 
 
 def hierarchical_loss(probabilities, targets, hierarchy_list):
