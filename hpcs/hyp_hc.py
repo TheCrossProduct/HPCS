@@ -1,3 +1,5 @@
+import warnings
+
 import torch
 import numpy as np
 import pytorch_lightning as pl
@@ -68,6 +70,7 @@ class SimilarityHypHC(pl.LightningModule):
                  dataset: str = 'shapenet', lr: float = 1e-3, embedding: int = 6, k: int = 10, margin: float = 1.0, t_per_anchor: int = 50,
                  fraction: float = 1.2, temperature: float = 0.05, anneal_factor: float = 0.5, anneal_step: int = 0, num_class: int = 4,
                  normalize: bool = False, class_vector: bool = False, trade_off: float = 0.1, hierarchical: bool = False, hierarchy_list: list = []):
+        warnings.warn("This class is deprecated. Please consider using ShapeNetHypHC or PartNetHypHC instead.")
         super(SimilarityHypHC, self).__init__()
         self.save_hyperparameters()
         self.model = nn
@@ -102,7 +105,6 @@ class SimilarityHypHC(pl.LightningModule):
                                                   scale=self.scale,
                                                   temperature=self.temperature,
                                                   anneal_factor=self.anneal_factor,
-                                                  normalize=self.normalize,
                                                   num_class=self.num_class,
                                                   embedding=self.embedding,
                                                   hierarchy_list=self.hierarchy_list)
