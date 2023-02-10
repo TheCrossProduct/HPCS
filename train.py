@@ -190,7 +190,6 @@ def configure(args):
                               num_class=num_class,
                               class_vector=class_vector,
                               trade_off=trade_off,
-                              metric_learning=metric_learning,
                               cosface=cosface,
                               hierarchical=hierarchical,
                               hierarchy_list=hierarchy_list,
@@ -211,7 +210,6 @@ def configure(args):
                              num_class=num_class,
                              class_vector=class_vector,
                              trade_off=trade_off,
-                             metric_learning=metric_learning,
                              cosface=cosface,
                              hierarchical=hierarchical,
                              hierarchy_list=hierarchy_list,
@@ -277,6 +275,7 @@ def train(model, trainer, train_loader, valid_loader, test_loader, resume):
 
 if __name__ == "__main__":
     args = read_configutation()
-    wandb.init(project='HPCS', mode=args.wandb)
+
+    wandb.init(project='HPCS', mode=args.wandb, config=args)
     model, trainer, train_loader, valid_loader, test_loader, resume, wandb_mode = configure(args)
     train(model, trainer, train_loader, valid_loader, test_loader, resume)
