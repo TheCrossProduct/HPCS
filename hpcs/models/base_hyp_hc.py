@@ -82,10 +82,12 @@ class BaseSimilarityHypHC(pl.LightningModule):
 
         if self.nn_emb is not None:
             loss = self.metric_hyp_loss.compute_loss(x_poincare, labels.long())
-            losses['loss_metric'] = loss['loss_metric']['losses']
+            losses['loss_metric'] = loss['loss_metric']['losses'] * self.trade_off
+            losses['loss_hyp'] = loss['loss_hyp']['losses']
         else:
             loss = self.metric_hyp_loss.compute_loss(x_euclidean, labels.long())
-            losses['loss_metric'] = loss['loss_metric']['losses']
+            losses['loss_metric'] = loss['loss_metric']['losses'] * self.trade_off
+            losses['loss_hyp'] = loss['loss_hyp']['losses']
 
         return losses
 

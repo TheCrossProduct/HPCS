@@ -13,4 +13,5 @@ python train.py \
   -epochs 20 \
   -batch 6 \
   -lr 0.005 \
-  -accelerator 'gpu'
+  -accelerator 'gpu' \
+  -trade_off 0.02

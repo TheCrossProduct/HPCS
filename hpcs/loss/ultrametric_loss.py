@@ -35,8 +35,6 @@ class MetricHyperbolicLoss(BaseMetricLossFunction):
 
         if self.miner:
             self.hyp_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=0, t_per_anchor=self.t_per_anchor, fraction=self.fraction, type_of_triplets='easy')
-        else:
-            self.hyp_miner = None
 
         if self.cosface:
             if self.hierarchical:

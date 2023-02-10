@@ -45,7 +45,7 @@ def read_configutation():
     parser.add_argument('--anneal_factor', '-anneal_factor', default=2, type=float, help='annealing factor')
     parser.add_argument('--anneal_step', '-anneal_step', default=0, type=int, help='use annealing each n step')
     parser.add_argument('--patience', '-patience', default=50, type=int, help='patience value for early stopping')
-    parser.add_argument('--trade_off', '-trade_off', default=0.5, type=float, help='control trade-off between two losses')
+    parser.add_argument('--trade_off', '-trade_off', default=0.50, type=float, help='control trade-off between two losses')
     parser.add_argument('--miner', '-miner', default=True, type=bool, help='triplet miner for hyperbolic loss')
     parser.add_argument('--cosface', '-cosface', default=True, type=bool, help='cosface / triplet loss')
     parser.add_argument('--class_vector', '-class_vector', default=False, type=bool, help='class vector to decode')
@@ -234,7 +234,8 @@ def configure(args):
                     'epochs': epochs,
                     'batch': batch,
                     'lr': lr,
-                    'accelerator': accelerator}
+                    'accelerator': accelerator,
+                    'trade_off': trade_off}
     print(model_params)
 
     savedir = os.path.join(logger.save_dir, logger.name, 'version_' + str(logger.version), 'checkpoints')
