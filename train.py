@@ -17,10 +17,10 @@ from hpcs.models import ShapeNetHypHC, PartNetHypHC
 from hpcs.nn.dgcnn import DGCNN_partseg, VN_DGCNN_partseg
 
 from hpcs.nn.pointnet import POINTNET_partseg, VN_POINTNET_partseg
-from hpcs.nn.hyperbolic import ExpMap
+from hpcs.nn.hyperbolic import ExpMap, MLPExpMap
 
 
-def read_configutation():
+def read_configuration():
     parser = argparse.ArgumentParser()
     parser.add_argument('--log', default='logs', type=str, help='dirname for logs')
     parser.add_argument('--dataset', '-dataset', default='shapenet', type=str, help='name of dataset to use')
@@ -45,11 +45,11 @@ def read_configutation():
     parser.add_argument('--anneal_factor', '-anneal_factor', default=2, type=float, help='annealing factor')
     parser.add_argument('--anneal_step', '-anneal_step', default=0, type=int, help='use annealing each n step')
     parser.add_argument('--patience', '-patience', default=50, type=int, help='patience value for early stopping')
-    parser.add_argument('--trade_off', '-trade_off', default=0.50, type=float, help='control trade-off between two losses')
-    parser.add_argument('--miner', '-miner', default=True, type=bool, help='triplet miner for hyperbolic loss')
+    parser.add_argument('--trade_off', '-trade_off', default=1.0, type=float, help='control trade-off between two losses')
+    parser.add_argument('--miner', '-miner', default=False, type=bool, help='triplet miner for hyperbolic loss')
     parser.add_argument('--cosface', '-cosface', default=True, type=bool, help='cosface / triplet loss')
     parser.add_argument('--class_vector', '-class_vector', default=False, type=bool, help='class vector to decode')
-    parser.add_argument('--hierarchical', '-hierarchical', default=True, type=bool, help='hierarchical loss')
+    parser.add_argument('--hierarchical', '-hierarchical', default=False, type=bool, help='hierarchical loss')
     parser.add_argument('--hierarchy_list', '-hierarchy_list', default=[], type=list, help='precomputed hierarchy list')
     parser.add_argument('--plot_inference', '-plot_inference', default=False, type=bool, help='plot visualizations during testing')
     parser.add_argument('--pretrained', '-pretrained', default=False, type=bool, help='load pretrained model')
@@ -59,16 +59,15 @@ def read_configutation():
     return args
 
 
-def configure_feature_extractor(model_name, embedding_size, num_class, k, dropout, pretrained):
-    out_features = embedding_size
+def configure_feature_extractor(model_name, num_class, k, dropout, pretrained):
     if model_name == 'dgcnn_partseg':
-        nn = DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout, num_class=num_class)
+        nn = DGCNN_partseg(in_channels=3, out_features=num_class, k=k, dropout=dropout, num_class=num_class)
     elif model_name == 'vn_dgcnn_partseg':
-        nn = VN_DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean', num_class=num_class)
+        nn = VN_DGCNN_partseg(in_channels=3, out_features=num_class, k=k, dropout=dropout, pooling='mean', num_class=num_class)
     elif model_name == 'pointnet_partseg':
-        nn = POINTNET_partseg(num_part=out_features, normal_channel=False)
+        nn = POINTNET_partseg(num_part=num_class, normal_channel=False)
     elif model_name == 'vn_pointnet_partseg':
-        nn = VN_POINTNET_partseg(num_part=out_features, normal_channel=True, k=k, pooling='mean')
+        nn = VN_POINTNET_partseg(num_part=num_class, normal_channel=True, k=k, pooling='mean')
     else:
         raise ValueError(f"Not implemented for model_name {model_name}")
 
@@ -83,11 +82,6 @@ def configure_feature_extractor(model_name, embedding_size, num_class, k, dropou
     return nn
 
 
-def configure_embedder(embedder_name, input_features, output_features, radius):
-    nn = ExpMap()
-    return nn
-
-
 def configure(args):
     wandb.config.update(args)
     log = args.log
@@ -98,7 +92,7 @@ def configure(args):
     model_name = args.model
     train_rotation = args.train_rotation
     test_rotation = args.test_rotation
-    embedding = args.embedding
+    hyp_embedding = args.embedding
     k = args.k
     margin = args.margin
     t_per_anchor = args.t_per_anchor
@@ -168,11 +162,12 @@ def configure(args):
     test_loader = DataLoader(test_dataset, batch_size=batch, shuffle=False, num_workers=num_workers, drop_last=True)
 
     nn_feat = configure_feature_extractor(model_name=model_name,
-                                          embedding_size=embedding,
-                                          num_class=num_class, k=k,
+                                          num_class=num_class,
+                                          k=k,
                                           dropout=dropout,
                                           pretrained=pretrained)
-    nn_emb = ExpMap()
+
+    nn_emb = MLPExpMap(input_feat=num_class, out_feat=hyp_embedding, negative_slope=-1.0, dropout=0.0)
 
     if dataset == 'shapenet':
         model = ShapeNetHypHC(nn_feat=nn_feat,
@@ -180,7 +175,7 @@ def configure(args):
                               train_rotation=train_rotation,
                               test_rotation=test_rotation,
                               lr=lr,
-                              embedding=embedding,
+                              embedding=hyp_embedding,
                               margin=margin,
                               t_per_anchor=t_per_anchor,
                               fraction=fraction,
@@ -192,8 +187,6 @@ def configure(args):
                               trade_off=trade_off,
                               miner=miner,
                               cosface=cosface,
-                              hierarchical=hierarchical,
-                              hierarchy_list=hierarchy_list,
                               plot_inference=plot_inference)
     elif dataset == 'partnet':
         model = PartNetHypHC(nn_feat=nn_feat,
@@ -201,7 +194,7 @@ def configure(args):
                              train_rotation=train_rotation,
                              test_rotation=test_rotation,
                              lr=lr,
-                             embedding=embedding,
+                             embedding=hyp_embedding,
                              margin=margin,
                              t_per_anchor=t_per_anchor,
                              fraction=fraction,
@@ -225,7 +218,7 @@ def configure(args):
                     'level': level if dataset == 'partnet' else 'coarse',
                     'fixed_points': fixed_points,
                     'model': model_name,
-                    'embedding': embedding,
+                    'embedding': hyp_embedding,
                     'k': k,
                     'margin': margin,
                     't_per_anchor': t_per_anchor,
@@ -277,7 +270,7 @@ def train(model, trainer, train_loader, valid_loader, test_loader, resume):
 
 
 if __name__ == "__main__":
-    args = read_configutation()
+    args = read_configuration()
 
     wandb.init(project='HPCS', mode=args.wandb, config=args)
     model, trainer, train_loader, valid_loader, test_loader, resume, wandb_mode = configure(args)

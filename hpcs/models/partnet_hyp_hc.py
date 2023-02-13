@@ -5,6 +5,7 @@ from pytorch3d.transforms import RotateAxisAngle, Rotate, random_rotations
 
 from hpcs.models.base_hyp_hc import BaseSimilarityHypHC
 from hpcs.utils.data import to_categorical
+from hpcs.loss.ultrametric_loss import HierarchicalMetricHyperbolicLoss
 
 
 class PartNetHypHC(BaseSimilarityHypHC):
@@ -42,8 +43,6 @@ class PartNetHypHC(BaseSimilarityHypHC):
                                            trade_off=trade_off,
                                            miner=miner,
                                            cosface=cosface,
-                                           hierarchical=hierarchical,
-                                           hierarchy_list=hierarchy_list,
                                            plot_inference=plot_inference)
 
         self.train_rotation = train_rotation
@@ -51,6 +50,17 @@ class PartNetHypHC(BaseSimilarityHypHC):
         self.class_vector = class_vector
         self.hierarchical = hierarchical
         self.hierarchy_list = hierarchy_list
+        if self.hierarchical:
+            self.metric_hyp_loss = HierarchicalMetricHyperbolicLoss(margin=self.margin,
+                                                        t_per_anchor=self.t_per_anchor,
+                                                        fraction=self.fraction,
+                                                        scale=self.scale,
+                                                        temperature=self.temperature,
+                                                        anneal_factor=self.anneal_factor,
+                                                        num_class=self.num_class,
+                                                        embedding=self.embedding,
+                                                        miner=self.miner,
+                                                        hierarchy_list=self.hierarchy_list)
 
     def _forward(self, batch, testing):
         points, targets = batch

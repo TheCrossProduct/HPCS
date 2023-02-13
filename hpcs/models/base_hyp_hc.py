@@ -31,9 +31,7 @@ class BaseSimilarityHypHC(pl.LightningModule):
                  trade_off: float = 0.1,
                  miner: bool = True,
                  cosface: bool = True,
-                 hierarchical: bool = False,
-                 hierarchy_list: list = [],
-                 plot_inference: bool = False):
+                 plot_inference: bool = True):
 
         super(BaseSimilarityHypHC, self).__init__()
         self.save_hyperparameters()
@@ -51,8 +49,6 @@ class BaseSimilarityHypHC(pl.LightningModule):
         self.trade_off = trade_off
         self.miner = miner
         self.cosface = cosface
-        self.hierarchical = hierarchical
-        self.hierarchy_list = hierarchy_list
         self.plot_inference = plot_inference
 
         self.scale = torch.nn.Parameter(torch.Tensor([1e-3]), requires_grad=True)
@@ -65,29 +61,22 @@ class BaseSimilarityHypHC(pl.LightningModule):
                                                     num_class=self.num_class,
                                                     embedding=self.embedding,
                                                     miner=self.miner,
-                                                    cosface=self.cosface,
-                                                    hierarchical=self.hierarchical,
-                                                    hierarchy_list=self.hierarchy_list)
+                                                    cosface=self.cosface)
 
     def _decode_linkage(self, leaves_embeddings):
         """Build linkage matrix from leaves' embeddings. Assume points are normalized to same radius."""
         leaves_embeddings = self.metric_hyp_loss.normalize_embeddings(leaves_embeddings)
         leaves_embeddings = project(leaves_embeddings).detach().cpu()
-        Z = linkage(leaves_embeddings, method='ward', metric='euclidean')
+        Z = linkage(leaves_embeddings, method='complete', metric='cosine')
         return Z
 
-    def compute_losses(self, x_euclidean, x_poincare, labels):
+    def compute_losses(self, x_poincare, labels):
         labels = labels.view(-1, 1)[:, 0]
         losses = {}
 
-        if self.nn_emb is not None:
-            loss = self.metric_hyp_loss.compute_loss(x_poincare, labels.long())
-            losses['loss_metric'] = loss['loss_metric']['losses'] * self.trade_off
-            losses['loss_hyp'] = loss['loss_hyp']['losses']
-        else:
-            loss = self.metric_hyp_loss.compute_loss(x_euclidean, labels.long())
-            losses['loss_metric'] = loss['loss_metric']['losses'] * self.trade_off
-            losses['loss_hyp'] = loss['loss_hyp']['losses']
+        loss = self.metric_hyp_loss.compute_loss(x_poincare, labels.long())
+        losses['loss_metric'] = loss['loss_metric']['losses']
+        losses['loss_hyp'] = loss['loss_hyp']['losses'] * self.trade_off
 
         return losses
 
@@ -102,8 +91,9 @@ class BaseSimilarityHypHC(pl.LightningModule):
 
     def forward(self, batch, testing: bool = False):
         points, x_euclidean, x_poincare, pts_labels = self._forward(batch, testing)
-        x_poincare_reshape = x_poincare.contiguous().view(-1, self.embedding)
-        losses = self.compute_losses(x_euclidean, x_poincare_reshape, pts_labels)
+        x_poincare_reshape = x_poincare.contiguous().view(-1, x_poincare.shape[-1])
+
+        losses = self.compute_losses(x_poincare_reshape, pts_labels)
 
         if testing:
             linkage_matrix = []
@@ -158,17 +148,18 @@ class BaseSimilarityHypHC(pl.LightningModule):
         indexes = []
         for object_idx in range(points.size(0)):
             best_pred, best_k, best_score = get_optimal_k(targets[object_idx].cpu(), linkage_matrix[object_idx], 'iou')
-            if self.plot_inference:
-                emb_poincare = self.metric_hyp_loss.normalize_embeddings(x_poincare[object_idx])
-                plot_hyperbolic_eval(x=points[object_idx].T.cpu(),
-                                     y=targets[object_idx].cpu(),
-                                     y_pred=best_pred,
-                                     emb_hidden=x_euclidean[object_idx].cpu(),
-                                     emb_poincare=emb_poincare.cpu(),
-                                     linkage_matrix=linkage_matrix[object_idx],
-                                     k=best_k,
-                                     score=best_score,
-                                     show=True)
+            print(f"Showing Plot {self.plot_inference}")
+            # if self.plot_inference:
+            emb_poincare = self.metric_hyp_loss.normalize_embeddings(x_poincare[object_idx])
+            plot_hyperbolic_eval(x=points[object_idx].T.cpu(),
+                                 y=targets[object_idx].cpu(),
+                                 y_pred=best_pred,
+                                 emb_hidden=x_euclidean[object_idx].cpu(),
+                                 emb_poincare=emb_poincare.cpu(),
+                                 linkage_matrix=linkage_matrix[object_idx],
+                                 k=best_k,
+                                 score=best_score,
+                                 show=True)
 
             indexes.append(best_score)
         score = torch.mean(torch.tensor(indexes))

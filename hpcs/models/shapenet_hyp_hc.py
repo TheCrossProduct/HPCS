@@ -22,8 +22,6 @@ class ShapeNetHypHC(BaseSimilarityHypHC):
                  trade_off: float = 0.1,
                  miner: bool = True,
                  cosface: bool = True,
-                 hierarchical: bool = False,
-                 hierarchy_list: list = [],
                  plot_inference: bool = False,
                  train_rotation: str = 'so3',
                  test_rotation: str = 'so3',
@@ -42,8 +40,6 @@ class ShapeNetHypHC(BaseSimilarityHypHC):
                                             trade_off=trade_off,
                                             miner=miner,
                                             cosface=cosface,
-                                            hierarchical=hierarchical,
-                                            hierarchy_list=hierarchy_list,
                                             plot_inference=plot_inference)
 
         self.train_rotation = train_rotation
