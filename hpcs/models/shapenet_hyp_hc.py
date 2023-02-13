@@ -11,7 +11,6 @@ class ShapeNetHypHC(BaseSimilarityHypHC):
     def __init__(self, nn_feat: torch.nn.Module,
                  nn_emb: Optional[torch.nn.Module],
                  lr: float = 1e-3,
-                 embedding: int = 6,
                  margin: float = 0.5,
                  t_per_anchor: int = 50,
                  fraction: float = 1.2,
@@ -19,6 +18,7 @@ class ShapeNetHypHC(BaseSimilarityHypHC):
                  anneal_factor: float = 0.5,
                  anneal_step: int = 0,
                  num_class: int = 4,
+                 num_categories: int = 1,
                  trade_off: float = 0.1,
                  miner: bool = True,
                  cosface: bool = True,
@@ -29,7 +29,6 @@ class ShapeNetHypHC(BaseSimilarityHypHC):
         super(ShapeNetHypHC, self).__init__(nn_feat=nn_feat,
                                             nn_emb=nn_emb,
                                             lr=lr,
-                                            embedding=embedding,
                                             margin=margin,
                                             t_per_anchor=t_per_anchor,
                                             fraction=fraction,
@@ -41,7 +40,7 @@ class ShapeNetHypHC(BaseSimilarityHypHC):
                                             miner=miner,
                                             cosface=cosface,
                                             plot_inference=plot_inference)
-
+        self.num_categories = num_categories
         self.train_rotation = train_rotation
         self.test_rotation = test_rotation
         self.class_vector = class_vector
@@ -75,8 +74,7 @@ class ShapeNetHypHC(BaseSimilarityHypHC):
                 batch_class_vector.append(class_vector)
             decode_vector = torch.stack(batch_class_vector)
         else:
-            num_categories = 1
-            decode_vector = to_categorical(label, num_categories)
+            decode_vector = to_categorical(label, self.num_categories)
 
         x_euclidean = self.nn_feat(points, decode_vector)
         if self.nn_emb:

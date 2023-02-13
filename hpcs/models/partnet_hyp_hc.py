@@ -12,7 +12,6 @@ class PartNetHypHC(BaseSimilarityHypHC):
     def __init__(self, nn_feat: torch.nn.Module,
                  nn_emb: Optional[torch.nn.Module],
                  lr: float = 1e-3,
-                 embedding: int = 6,
                  margin: float = 0.5,
                  t_per_anchor: int = 50,
                  fraction: float = 1.2,
@@ -32,7 +31,6 @@ class PartNetHypHC(BaseSimilarityHypHC):
         super(PartNetHypHC, self).__init__(nn_feat=nn_feat,
                                            nn_emb=nn_emb,
                                            lr=lr,
-                                           embedding=embedding,
                                            margin=margin,
                                            t_per_anchor=t_per_anchor,
                                            fraction=fraction,
@@ -52,15 +50,15 @@ class PartNetHypHC(BaseSimilarityHypHC):
         self.hierarchy_list = hierarchy_list
         if self.hierarchical:
             self.metric_hyp_loss = HierarchicalMetricHyperbolicLoss(margin=self.margin,
-                                                        t_per_anchor=self.t_per_anchor,
-                                                        fraction=self.fraction,
-                                                        scale=self.scale,
-                                                        temperature=self.temperature,
-                                                        anneal_factor=self.anneal_factor,
-                                                        num_class=self.num_class,
-                                                        embedding=self.embedding,
-                                                        miner=self.miner,
-                                                        hierarchy_list=self.hierarchy_list)
+                                                                    t_per_anchor=self.t_per_anchor,
+                                                                    fraction=self.fraction,
+                                                                    scale=self.scale,
+                                                                    temperature=self.temperature,
+                                                                    anneal_factor=self.anneal_factor,
+                                                                    num_class=self.num_class,
+                                                                    euclidean_size=self.num_class,
+                                                                    miner=self.miner,
+                                                                    hierarchy_list=self.hierarchy_list)
 
     def _forward(self, batch, testing):
         points, targets = batch

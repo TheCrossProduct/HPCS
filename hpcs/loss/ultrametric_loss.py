@@ -15,7 +15,7 @@ from hpcs.distances import hyp_lca, CosineSimilarity
 
 class MetricHyperbolicLoss(BaseMetricLossFunction):
     def __init__(self, margin: float = 1.0, t_per_anchor: int = 50, fraction: float = 1.2, scale: Union[float, torch.tensor, torch.nn.Parameter] = 1e-3,
-                 temperature: float = 0.05, anneal_factor: float = 0.5, num_class: int = 4, embedding: int = 2,
+                 temperature: float = 0.05, anneal_factor: float = 0.5, num_class: int = 4, euclidean_size: int = 4,
                  cosface: bool = True, miner: bool = False):
         super(MetricHyperbolicLoss, self).__init__()
         self.margin = margin
@@ -25,7 +25,7 @@ class MetricHyperbolicLoss(BaseMetricLossFunction):
         self.temperature = temperature
         self.anneal_factor = anneal_factor
         self.num_class = num_class
-        self.embedding = embedding
+        self.euclidean_size = euclidean_size
         self.cosface = cosface
         self.miner = miner
 
@@ -35,13 +35,13 @@ class MetricHyperbolicLoss(BaseMetricLossFunction):
             self.hyp_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=0, t_per_anchor=self.t_per_anchor, fraction=self.fraction, type_of_triplets='easy')
 
         if self.cosface:
-            self.loss_cosface = CosFaceLoss(num_classes=self.num_class, embedding_size=self.embedding, margin=0.35, scale=1)
+            self.loss_cosface = CosFaceLoss(num_classes=self.num_class, embedding_size=self.euclidean_size, margin=0.35, scale=2)
         else:
             self.triplet_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=self.margin, t_per_anchor=self.t_per_anchor, fraction=self.fraction, type_of_triplets='semihard')
             self.loss_triplet = TripletMarginLoss(distance=self.distance_sim, margin=self.margin)
 
     def get_triplets(self, n_samples):
-        n_triplets = self.t_per_anchor * (n_samples * (n_samples -1 ) // 2)
+        n_triplets = self.t_per_anchor * (n_samples * (n_samples - 1 ) // 2)
 
         ij = torch.combinations(torch.arange(n_samples), r=2)
         ij = ij.repeat_interleave(self.t_per_anchor, dim=0)
@@ -93,15 +93,15 @@ class MetricHyperbolicLoss(BaseMetricLossFunction):
 
         return loss_hyperbolic
 
-    def compute_loss(self, x_embedding, labels, *args):
+    def compute_loss(self, x_euclidean, x_poincare, labels, *args):
 
-        loss_hyperbolic = self.compute_hyp(x_embedding, labels)
+        loss_hyperbolic = self.compute_hyp(x_poincare, labels)
 
         if self.cosface:
-            loss_metric = self.loss_cosface(x_embedding, labels.long())
+            loss_metric = self.loss_cosface(x_euclidean, labels.long())
         else:
-            triplet_indices_tuple = self.triplet_miner(x_embedding, labels)
-            loss_metric = self.loss_triplet_sim(x_embedding, labels, triplet_indices_tuple)
+            triplet_indices_tuple = self.triplet_miner(x_poincare, labels)
+            loss_metric = self.loss_triplet_sim(x_poincare, labels, triplet_indices_tuple)
 
         return {
             "loss_hyp": {
@@ -128,26 +128,25 @@ class MetricHyperbolicLoss(BaseMetricLossFunction):
 class HierarchicalMetricHyperbolicLoss(MetricHyperbolicLoss):
     def __init__(self, margin: float = 1.0, t_per_anchor: int = 50, fraction: float = 1.2, scale: Union[
         float, torch.tensor, torch.nn.Parameter] = 1e-3, temperature: float = 0.05, anneal_factor: float = 0.5,
-                 num_class: int = 4, embedding: int = 4, miner: bool = False, hierarchy_list: list = []):
-        super(self, HierarchicalMetricHyperbolicLoss).__init__(margin=margin,
+                 num_class: int = 4, euclidean_size: int = 4, miner: bool = False, hierarchy_list: list = []):
+        super(HierarchicalMetricHyperbolicLoss, self).__init__(margin=margin,
                                                                t_per_anchor=t_per_anchor,
                                                                fraction=fraction,
                                                                scale=scale,
                                                                temperature=temperature,
                                                                anneal_factor=anneal_factor,
                                                                num_class=num_class,
-                                                               embedding=embedding,
+                                                               euclidean_size=euclidean_size,
                                                                cosface=True,
                                                                miner=miner)
-        super().__init__(margin, t_per_anchor, fraction, scale, temperature, anneal_factor, num_class, embedding, miner)
         self.hierarchy_list = hierarchy_list
-        self.loss_cosface = HierarchicalCosFaceLoss(num_classes=self.num_class, embedding_size=self.embedding,
+        self.loss_cosface = HierarchicalCosFaceLoss(num_classes=self.num_class, embedding_size=self.euclidean_size,
                                                     margin=0.35, scale=64, hierarchy_list=self.hierarchy_list)
 
-    def compute_loss(self, x_embedding, labels, *args):
-        loss_hyperbolic = self.compute_hyp(x_embedding, labels)
+    def compute_loss(self, x_euclidean, x_poincare, labels, *args):
+        loss_hyperbolic = self.compute_hyp(x_poincare, labels)
 
-        loss_metric = self.loss_cosface(x_embedding, labels.long())
+        loss_metric = self.loss_cosface(x_euclidean, labels.long())
 
         return {
             "loss_hyp": {

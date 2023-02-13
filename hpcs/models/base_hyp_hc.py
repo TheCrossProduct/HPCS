@@ -20,7 +20,6 @@ class BaseSimilarityHypHC(pl.LightningModule):
     def __init__(self, nn_feat: torch.nn.Module,
                  nn_emb: Optional[torch.nn.Module],
                  lr: float = 1e-3,
-                 embedding: int = 6,
                  margin: float = 0.5,
                  t_per_anchor: int = 50,
                  fraction: float = 1.2,
@@ -38,7 +37,6 @@ class BaseSimilarityHypHC(pl.LightningModule):
         self.nn_feat = nn_feat
         self.nn_emb = nn_emb
         self.lr = lr
-        self.embedding = embedding
         self.margin = margin
         self.t_per_anchor = t_per_anchor
         self.fraction = fraction
@@ -59,7 +57,7 @@ class BaseSimilarityHypHC(pl.LightningModule):
                                                     temperature=self.temperature,
                                                     anneal_factor=self.anneal_factor,
                                                     num_class=self.num_class,
-                                                    embedding=self.embedding,
+                                                    euclidean_size=self.num_class,
                                                     miner=self.miner,
                                                     cosface=self.cosface)
 
@@ -70,11 +68,11 @@ class BaseSimilarityHypHC(pl.LightningModule):
         Z = linkage(leaves_embeddings, method='complete', metric='cosine')
         return Z
 
-    def compute_losses(self, x_poincare, labels):
+    def compute_losses(self, x_euclidean, x_poincare, labels):
         labels = labels.view(-1, 1)[:, 0]
         losses = {}
 
-        loss = self.metric_hyp_loss.compute_loss(x_poincare, labels.long())
+        loss = self.metric_hyp_loss.compute_loss(x_euclidean, x_poincare, labels.long())
         losses['loss_metric'] = loss['loss_metric']['losses']
         losses['loss_hyp'] = loss['loss_hyp']['losses'] * self.trade_off
 
@@ -91,9 +89,10 @@ class BaseSimilarityHypHC(pl.LightningModule):
 
     def forward(self, batch, testing: bool = False):
         points, x_euclidean, x_poincare, pts_labels = self._forward(batch, testing)
+        x_euclidean_reshape = x_euclidean.contiguous().view(-1, x_euclidean.shape[-1])
         x_poincare_reshape = x_poincare.contiguous().view(-1, x_poincare.shape[-1])
 
-        losses = self.compute_losses(x_poincare_reshape, pts_labels)
+        losses = self.compute_losses(x_euclidean_reshape, x_poincare_reshape, pts_labels)
 
         if testing:
             linkage_matrix = []

@@ -125,13 +125,6 @@ def configure(args):
         valid_dataset = ShapeNetDataset(root=data_folder, npoints=fixed_points, split='val', class_choice=category)
         test_dataset = ShapeNetDataset(root=data_folder, npoints=fixed_points, split='test', class_choice=category)
 
-        if category is None:
-            num_categories = 16
-            num_class = 50
-        else:
-            num_categories = 1
-            num_class = len(train_dataset.seg_classes[category])
-
     elif dataset == 'partnet':
         data_folder = 'data/PartNet/sem_seg_h5/'
 
@@ -159,6 +152,13 @@ def configure(args):
     else:
         raise KeyError(f"Not available implementation for dataset: {dataset}")
 
+    if category is None:
+        num_categories = 16
+        num_class = 50
+    else:
+        num_categories = 1
+        num_class = len(train_dataset.seg_classes[category])
+
     train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers, drop_last=True)
     valid_loader = DataLoader(valid_dataset, batch_size=batch, shuffle=False, num_workers=num_workers, drop_last=True)
     test_loader = DataLoader(test_dataset, batch_size=batch, shuffle=False, num_workers=num_workers, drop_last=True)
@@ -178,7 +178,6 @@ def configure(args):
                               train_rotation=train_rotation,
                               test_rotation=test_rotation,
                               lr=lr,
-                              embedding=hyp_embedding,
                               margin=margin,
                               t_per_anchor=t_per_anchor,
                               fraction=fraction,
@@ -186,6 +185,7 @@ def configure(args):
                               anneal_factor=anneal_factor,
                               anneal_step=anneal_step,
                               num_class=num_class,
+                              num_categories=num_categories,
                               class_vector=class_vector,
                               trade_off=trade_off,
                               miner=miner,
@@ -197,7 +197,6 @@ def configure(args):
                              train_rotation=train_rotation,
                              test_rotation=test_rotation,
                              lr=lr,
-                             embedding=hyp_embedding,
                              margin=margin,
                              t_per_anchor=t_per_anchor,
                              fraction=fraction,
