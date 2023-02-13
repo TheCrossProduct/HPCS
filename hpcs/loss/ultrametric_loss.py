@@ -122,8 +122,7 @@ class MetricHyperbolicLoss(BaseMetricLossFunction):
         """Normalize leaves embeddings to have the lie on a diameter."""
         min_scale = 1e-4
         max_scale = 1
-        scale = self.scale.to(embeddings.device)
-        return F.normalize(embeddings, p=2, dim=1) * torch.clamp(scale, min_scale, max_scale)
+        return F.normalize(embeddings, p=2, dim=1) * torch.clamp(self.scale, min_scale, max_scale)
 
 
 class HierarchicalMetricHyperbolicLoss(MetricHyperbolicLoss):

@@ -46,7 +46,7 @@ def read_configuration():
     parser.add_argument('--anneal_step', '-anneal_step', default=0, type=int, help='use annealing each n step')
     parser.add_argument('--patience', '-patience', default=50, type=int, help='patience value for early stopping')
     parser.add_argument('--trade_off', '-trade_off', default=1.0, type=float, help='control trade-off between two losses')
-    parser.add_argument('--miner', '-miner', default=False, type=bool, help='triplet miner for hyperbolic loss')
+    parser.add_argument('--miner', '-miner', default=True, type=bool, help='triplet miner for hyperbolic loss')
     parser.add_argument('--cosface', '-cosface', default=True, type=bool, help='cosface / triplet loss')
     parser.add_argument('--class_vector', '-class_vector', default=False, type=bool, help='class vector to decode')
     parser.add_argument('--hierarchical', '-hierarchical', default=False, type=bool, help='hierarchical loss')
@@ -59,11 +59,11 @@ def read_configuration():
     return args
 
 
-def configure_feature_extractor(model_name, num_class, k, dropout, pretrained):
+def configure_feature_extractor(model_name, num_class, num_categories, k, dropout, pretrained):
     if model_name == 'dgcnn_partseg':
-        nn = DGCNN_partseg(in_channels=3, out_features=num_class, k=k, dropout=dropout, num_class=num_class)
+        nn = DGCNN_partseg(in_channels=3, out_features=num_class, k=k, dropout=dropout, num_categories=num_categories)
     elif model_name == 'vn_dgcnn_partseg':
-        nn = VN_DGCNN_partseg(in_channels=3, out_features=num_class, k=k, dropout=dropout, pooling='mean', num_class=num_class)
+        nn = VN_DGCNN_partseg(in_channels=3, out_features=num_class, k=k, dropout=dropout, pooling='mean', num_categories=num_categories)
     elif model_name == 'pointnet_partseg':
         nn = POINTNET_partseg(num_part=num_class, normal_channel=False)
     elif model_name == 'vn_pointnet_partseg':
@@ -125,10 +125,12 @@ def configure(args):
         valid_dataset = ShapeNetDataset(root=data_folder, npoints=fixed_points, split='val', class_choice=category)
         test_dataset = ShapeNetDataset(root=data_folder, npoints=fixed_points, split='test', class_choice=category)
 
-        if class_vector:
-            num_class = len(train_dataset.seg_classes[category])
+        if category is None:
+            num_categories = 16
+            num_class = 50
         else:
-            num_class = 16
+            num_categories = 1
+            num_class = len(train_dataset.seg_classes[category])
 
     elif dataset == 'partnet':
         data_folder = 'data/PartNet/sem_seg_h5/'
@@ -163,6 +165,7 @@ def configure(args):
 
     nn_feat = configure_feature_extractor(model_name=model_name,
                                           num_class=num_class,
+                                          num_categories=num_categories,
                                           k=k,
                                           dropout=dropout,
                                           pretrained=pretrained)

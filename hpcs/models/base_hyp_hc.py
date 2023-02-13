@@ -148,20 +148,19 @@ class BaseSimilarityHypHC(pl.LightningModule):
         indexes = []
         for object_idx in range(points.size(0)):
             best_pred, best_k, best_score = get_optimal_k(targets[object_idx].cpu(), linkage_matrix[object_idx], 'iou')
-            print(f"Showing Plot {self.plot_inference}")
-            # if self.plot_inference:
-            emb_poincare = self.metric_hyp_loss.normalize_embeddings(x_poincare[object_idx])
-            plot_hyperbolic_eval(x=points[object_idx].T.cpu(),
-                                 y=targets[object_idx].cpu(),
-                                 y_pred=best_pred,
-                                 emb_hidden=x_euclidean[object_idx].cpu(),
-                                 emb_poincare=emb_poincare.cpu(),
-                                 linkage_matrix=linkage_matrix[object_idx],
-                                 k=best_k,
-                                 score=best_score,
-                                 show=True)
+            if self.plot_inference:
+                emb_poincare = self.metric_hyp_loss.normalize_embeddings(x_poincare[object_idx])
+                plot_hyperbolic_eval(x=points[object_idx].T.cpu(),
+                                     y=targets[object_idx].cpu(),
+                                     y_pred=best_pred,
+                                     emb_hidden=x_euclidean[object_idx].cpu(),
+                                     emb_poincare=emb_poincare.cpu(),
+                                     linkage_matrix=linkage_matrix[object_idx],
+                                     k=best_k,
+                                     score=best_score,
+                                     show=True)
 
-            indexes.append(best_score)
+                indexes.append(best_score)
         score = torch.mean(torch.tensor(indexes))
 
         self.log("score", score)

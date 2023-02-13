@@ -75,7 +75,7 @@ class ShapeNetHypHC(BaseSimilarityHypHC):
                 batch_class_vector.append(class_vector)
             decode_vector = torch.stack(batch_class_vector)
         else:
-            num_categories = self.num_class
+            num_categories = 1
             decode_vector = to_categorical(label, num_categories)
 
         x_euclidean = self.nn_feat(points, decode_vector)
