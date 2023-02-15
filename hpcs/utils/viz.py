@@ -198,8 +198,11 @@ def plot_clustering(X, y, idx=None, eps=1e-1):
 
 
 def plot_tsne(X, y, idx=None, eps=1e-1):
-    tsne = TSNE(2, init='pca', verbose=0)
-    tsne_proj = tsne.fit_transform(X)
+    if (X.shape[1] == 2):
+        tsne_proj = X
+    else:
+        tsne = TSNE(2, init='pca', verbose=0)
+        tsne_proj = tsne.fit_transform(X)
     # Plot those points as a scatter plot and label them based on the pred labels
     ec = COLORS[y % len(COLORS)]
     plt.scatter(tsne_proj[:, 0], tsne_proj[:, 1], s=15, linewidths=1.5, c=lighten_color(ec), edgecolors=ec, alpha=0.9)
