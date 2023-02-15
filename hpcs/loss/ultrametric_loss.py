@@ -56,13 +56,13 @@ class MetricHyperbolicLoss(BaseMetricLossFunction):
         return ij[mask,0], ij[mask, 1], k[mask]
 
     def compute_hyp(self, x_poincare, labels):
+        # print(f"SELF.MINER {self.miner}")
         if self.miner:
             hyp_indices_tuple = self.hyp_miner(x_poincare, labels)
         else:
             hyp_indices_tuple = self.get_triplets(x_poincare.shape[0])
 
         anchor_idx, positive_idx, negative_idx = hyp_indices_tuple
-
         mat_sim = self.distance_sim(x_poincare)
 
         wij = mat_sim[anchor_idx, positive_idx]

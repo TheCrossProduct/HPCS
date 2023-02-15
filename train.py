@@ -26,11 +26,12 @@ def read_configuration():
     parser.add_argument('--dataset', '-dataset', default='shapenet', type=str, help='name of dataset to use')
     parser.add_argument('--category', '-category', default='Airplane', type=str, help='category from dataset')
     parser.add_argument('--level', '-level', default=3, type=int, help='granularity level of partnet object')
-    parser.add_argument('--fixed_points', '-fixed_points', default=256, type=int, help='points retained from point cloud')
+    parser.add_argument('--fixed_points', '-fixed_points', default=512, type=int, help='points retained from point cloud')
     parser.add_argument('--model', '-model', default='vn_dgcnn_partseg', type=str, help='model to use to extract features')
     parser.add_argument('--train_rotation', '-train_rotation', default='so3', type=str, help='type of rotation augmentation for train')
     parser.add_argument('--test_rotation', '-test_rotation', default='so3', type=str, help='type of rotation augmentation for test')
-    parser.add_argument('--embedding', '-embedding', default=6, type=int, help='dimension of poincare space')
+    parser.add_argument('--eucl-embedding', default=4, type=int, help='dimension of euclidean space')
+    parser.add_argument('--hyp-embedding', default=2, type=int, help='dimension of poincare space')
     parser.add_argument('--k', '-k', default=10, type=int, help='if model dgcnn, k is the number of neigh to take into account')
     parser.add_argument('--margin', '-margin', default=0.05, type=float, help='margin value to use in miner loss')
     parser.add_argument('--t_per_anchor', '-t_per_anchor', default=50, type=int, help='margin value to use in miner loss')
@@ -46,24 +47,24 @@ def read_configuration():
     parser.add_argument('--anneal_step', '-anneal_step', default=0, type=int, help='use annealing each n step')
     parser.add_argument('--patience', '-patience', default=50, type=int, help='patience value for early stopping')
     parser.add_argument('--trade_off', '-trade_off', default=1.0, type=float, help='control trade-off between two losses')
-    parser.add_argument('--miner', '-miner', default=True, type=bool, help='triplet miner for hyperbolic loss')
-    parser.add_argument('--cosface', '-cosface', default=True, type=bool, help='cosface / triplet loss')
-    parser.add_argument('--class_vector', '-class_vector', default=False, type=bool, help='class vector to decode')
-    parser.add_argument('--hierarchical', '-hierarchical', default=False, type=bool, help='hierarchical loss')
+    parser.add_argument('--no-miner', action='store_false', help='triplet miner for hyperbolic loss')
+    parser.add_argument('--triplet-sim', action='store_true', help='cosface / triplet loss')
+    parser.add_argument('--class_vector', action='store_true', help='class vector to decode')
+    parser.add_argument('--hierarchical', action='store_true', help='hierarchical loss')
     parser.add_argument('--hierarchy_list', '-hierarchy_list', default=[], type=list, help='precomputed hierarchy list')
-    parser.add_argument('--plot_inference', '-plot_inference', default=False, type=bool, help='plot visualizations during testing')
-    parser.add_argument('--pretrained', '-pretrained', default=False, type=bool, help='load pretrained model')
-    parser.add_argument('--resume', '-resume', default=False, type=bool, help='resume training on model')
+    parser.add_argument('--plot_inference', action='store_true', help='plot visualizations during testing')
+    parser.add_argument('--pretrained', action='store_true', help='load pretrained model')
+    parser.add_argument('--resume', action='store_true', help='resume training on model')
     parser.add_argument('--wandb', '-wandb', default='online', type=str, help='Online/Offline WandB mode (Useful in JeanZay)')
     args = parser.parse_args()
     return args
 
 
-def configure_feature_extractor(model_name, num_class, num_categories, k, dropout, pretrained):
+def configure_feature_extractor(model_name, num_class, out_features, num_categories, k, dropout, pretrained):
     if model_name == 'dgcnn_partseg':
         nn = DGCNN_partseg(in_channels=3, out_features=num_class, k=k, dropout=dropout, num_categories=num_categories)
     elif model_name == 'vn_dgcnn_partseg':
-        nn = VN_DGCNN_partseg(in_channels=3, out_features=num_class, k=k, dropout=dropout, pooling='mean', num_categories=num_categories)
+        nn = VN_DGCNN_partseg(in_channels=3, out_features=out_features, k=k, dropout=dropout, pooling='mean', num_categories=num_categories)
     elif model_name == 'pointnet_partseg':
         nn = POINTNET_partseg(num_part=num_class, normal_channel=False)
     elif model_name == 'vn_pointnet_partseg':
@@ -92,7 +93,8 @@ def configure(args):
     model_name = args.model
     train_rotation = args.train_rotation
     test_rotation = args.test_rotation
-    hyp_embedding = args.embedding
+    eucl_embedding = args.eucl_embedding
+    hyp_embedding = args.hyp_embedding
     k = args.k
     margin = args.margin
     t_per_anchor = args.t_per_anchor
@@ -108,8 +110,8 @@ def configure(args):
     anneal_step = args.anneal_step
     patience = args.patience
     trade_off = args.trade_off
-    miner = args.miner
-    cosface = args.cosface
+    miner = args.no_miner
+    cosface = not args.triplet_sim
     class_vector = args.class_vector
     hierarchical = args.hierarchical
     hierarchy_list = args.hierarchy_list
@@ -156,7 +158,7 @@ def configure(args):
         num_categories = 16
         num_class = 50
     else:
-        num_categories = 1
+        num_categories = 16
         num_class = len(train_dataset.seg_classes[category])
 
     train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers, drop_last=True)
@@ -165,16 +167,20 @@ def configure(args):
 
     nn_feat = configure_feature_extractor(model_name=model_name,
                                           num_class=num_class,
+                                          out_features=eucl_embedding,
                                           num_categories=num_categories,
                                           k=k,
                                           dropout=dropout,
                                           pretrained=pretrained)
-
-    nn_emb = MLPExpMap(input_feat=num_class, out_feat=hyp_embedding, negative_slope=-1.0, dropout=0.0)
-
+    print(args)
+    # nn_emb = MLPExpMap(input_feat=num_class, out_feat=hyp_embedding, negative_slope=-1.0, dropout=0.0)
+    nn_emb = ExpMap()
     if dataset == 'shapenet':
+        print(f"Miner {miner}")
+        print(f"Cosface {cosface}")
         model = ShapeNetHypHC(nn_feat=nn_feat,
                               nn_emb=nn_emb,
+                              euclidean_size=eucl_embedding,
                               train_rotation=train_rotation,
                               test_rotation=test_rotation,
                               lr=lr,
@@ -185,7 +191,6 @@ def configure(args):
                               anneal_factor=anneal_factor,
                               anneal_step=anneal_step,
                               num_class=num_class,
-                              num_categories=num_categories,
                               class_vector=class_vector,
                               trade_off=trade_off,
                               miner=miner,
@@ -194,6 +199,7 @@ def configure(args):
     elif dataset == 'partnet':
         model = PartNetHypHC(nn_feat=nn_feat,
                              nn_emb=nn_emb,
+                             euclidean_size=eucl_embedding,
                              train_rotation=train_rotation,
                              test_rotation=test_rotation,
                              lr=lr,

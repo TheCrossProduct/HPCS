@@ -1,4 +1,6 @@
 from typing import Optional
+
+import numpy as np
 import torch
 from torch.nn import functional as F
 from pytorch3d.transforms import RotateAxisAngle, Rotate, random_rotations
@@ -10,6 +12,7 @@ from hpcs.utils.data import to_categorical
 class ShapeNetHypHC(BaseSimilarityHypHC):
     def __init__(self, nn_feat: torch.nn.Module,
                  nn_emb: Optional[torch.nn.Module],
+                 euclidean_size: int = 4,
                  lr: float = 1e-3,
                  margin: float = 0.5,
                  t_per_anchor: int = 50,
@@ -18,7 +21,6 @@ class ShapeNetHypHC(BaseSimilarityHypHC):
                  anneal_factor: float = 0.5,
                  anneal_step: int = 0,
                  num_class: int = 4,
-                 num_categories: int = 1,
                  trade_off: float = 0.1,
                  miner: bool = True,
                  cosface: bool = True,
@@ -28,6 +30,7 @@ class ShapeNetHypHC(BaseSimilarityHypHC):
                  class_vector: bool = False):
         super(ShapeNetHypHC, self).__init__(nn_feat=nn_feat,
                                             nn_emb=nn_emb,
+                                            euclidean_size=euclidean_size,
                                             lr=lr,
                                             margin=margin,
                                             t_per_anchor=t_per_anchor,
@@ -40,7 +43,7 @@ class ShapeNetHypHC(BaseSimilarityHypHC):
                                             miner=miner,
                                             cosface=cosface,
                                             plot_inference=plot_inference)
-        self.num_categories = num_categories
+        self.num_categories = 16
         self.train_rotation = train_rotation
         self.test_rotation = test_rotation
         self.class_vector = class_vector
@@ -61,7 +64,7 @@ class ShapeNetHypHC(BaseSimilarityHypHC):
         if trot is not None:
             points = trot.transform_points(points.cpu())
 
-        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        device = self.device
         points, label, targets = points.float().to(device), label.long().to(device), targets.long().to(device)
         points = points.transpose(2, 1)
 
@@ -81,5 +84,4 @@ class ShapeNetHypHC(BaseSimilarityHypHC):
             x_poincare = self.nn_emb(x_euclidean)
         else:
             x_poincare = None
-
         return points, x_euclidean, x_poincare, targets

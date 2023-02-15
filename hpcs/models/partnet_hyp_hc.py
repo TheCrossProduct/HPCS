@@ -11,6 +11,7 @@ from hpcs.loss.ultrametric_loss import HierarchicalMetricHyperbolicLoss
 class PartNetHypHC(BaseSimilarityHypHC):
     def __init__(self, nn_feat: torch.nn.Module,
                  nn_emb: Optional[torch.nn.Module],
+                 euclidean_size: int = 4,
                  lr: float = 1e-3,
                  margin: float = 0.5,
                  t_per_anchor: int = 50,
@@ -30,6 +31,7 @@ class PartNetHypHC(BaseSimilarityHypHC):
                  class_vector: bool = False):
         super(PartNetHypHC, self).__init__(nn_feat=nn_feat,
                                            nn_emb=nn_emb,
+                                           euclidean_size=euclidean_size,
                                            lr=lr,
                                            margin=margin,
                                            t_per_anchor=t_per_anchor,
