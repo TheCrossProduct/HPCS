@@ -269,13 +269,13 @@ def train(model, trainer, train_loader, valid_loader, test_loader, resume):
     if resume:
         wandb.restore('model.ckpt', root=os.getcwd(), run_path='liubigli-tcp/HPCS/runs/dwhnnf5v')
         model = model.load_from_checkpoint('model.ckpt')
-    #
-    # trainer.fit(model, train_loader, valid_loader)
-    #
-    # print("End Training")
-    #
-    # trainer.save_checkpoint('model.ckpt')
-    # wandb.save('model.ckpt')
+
+    trainer.fit(model, train_loader, valid_loader)
+
+    print("End Training")
+
+    trainer.save_checkpoint('model.ckpt')
+    wandb.save('model.ckpt')
 
     trainer.test(model, test_loader)
 
