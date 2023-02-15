@@ -12,8 +12,8 @@ from hpcs.utils.data import to_categorical
 class ShapeNetHypHC(BaseSimilarityHypHC):
     def __init__(self, nn_feat: torch.nn.Module,
                  nn_emb: Optional[torch.nn.Module],
-                 euclidean_size: int = 4,
-                 hyp_size: int = 4,
+                 euclidean_size: int,
+                 hyp_size: int,
                  lr: float = 1e-3,
                  margin: float = 0.5,
                  t_per_anchor: int = 50,
