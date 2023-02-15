@@ -82,6 +82,13 @@ def configure_feature_extractor(model_name, num_class, out_features, num_categor
         nn.load_state_dict(new_state_dict, strict=False)
     return nn
 
+def configure_hyperbolic_embedder(input_features: int, output_features: int):
+    if input_features == output_features:
+        print("Using Exponential Map")
+        return ExpMap()
+    else:
+        print("Using MLP + Exponential Map")
+        return MLPExpMap(input_feat=input_features, out_feat=output_features)
 
 def configure(args):
     wandb.config.update(args)
@@ -173,11 +180,10 @@ def configure(args):
                                           dropout=dropout,
                                           pretrained=pretrained)
     print(args)
-    nn_emb = MLPExpMap(input_feat=eucl_embedding, out_feat=hyp_embedding, negative_slope=-1.0, dropout=0.0)
-    # nn_emb = ExpMap()
+
+    nn_emb = configure_hyperbolic_embedder(input_features=eucl_embedding, output_features=hyp_embedding)
+
     if dataset == 'shapenet':
-        print(f"Miner {miner}")
-        print(f"Cosface {cosface}")
         model = ShapeNetHypHC(nn_feat=nn_feat,
                               nn_emb=nn_emb,
                               euclidean_size=eucl_embedding,
