@@ -30,7 +30,7 @@ def read_configuration():
     parser.add_argument('--model', '-model', default='vn_dgcnn_partseg', type=str, help='model to use to extract features')
     parser.add_argument('--train_rotation', '-train_rotation', default='so3', type=str, help='type of rotation augmentation for train')
     parser.add_argument('--test_rotation', '-test_rotation', default='so3', type=str, help='type of rotation augmentation for test')
-    parser.add_argument('--eucl-embedding', default=4, type=int, help='dimension of euclidean space')
+    parser.add_argument('--eucl-embedding', default=2, type=int, help='dimension of euclidean space')
     parser.add_argument('--hyp-embedding', default=2, type=int, help='dimension of poincare space')
     parser.add_argument('--k', '-k', default=10, type=int, help='if model dgcnn, k is the number of neigh to take into account')
     parser.add_argument('--margin', '-margin', default=0.05, type=float, help='margin value to use in miner loss')
@@ -173,14 +173,15 @@ def configure(args):
                                           dropout=dropout,
                                           pretrained=pretrained)
     print(args)
-    # nn_emb = MLPExpMap(input_feat=num_class, out_feat=hyp_embedding, negative_slope=-1.0, dropout=0.0)
-    nn_emb = ExpMap()
+    nn_emb = MLPExpMap(input_feat=eucl_embedding, out_feat=hyp_embedding, negative_slope=-1.0, dropout=0.0)
+    # nn_emb = ExpMap()
     if dataset == 'shapenet':
         print(f"Miner {miner}")
         print(f"Cosface {cosface}")
         model = ShapeNetHypHC(nn_feat=nn_feat,
                               nn_emb=nn_emb,
                               euclidean_size=eucl_embedding,
+                              hyp_size=hyp_embedding,
                               train_rotation=train_rotation,
                               test_rotation=test_rotation,
                               lr=lr,
@@ -200,6 +201,7 @@ def configure(args):
         model = PartNetHypHC(nn_feat=nn_feat,
                              nn_emb=nn_emb,
                              euclidean_size=eucl_embedding,
+                             hyp_size=hyp_embedding,
                              train_rotation=train_rotation,
                              test_rotation=test_rotation,
                              lr=lr,
@@ -226,7 +228,8 @@ def configure(args):
                     'level': level if dataset == 'partnet' else 'coarse',
                     'fixed_points': fixed_points,
                     'model': model_name,
-                    'embedding': hyp_embedding,
+                    'eucl_embedding': eucl_embedding,
+                    'hyp_embedding': hyp_embedding,
                     'k': k,
                     'margin': margin,
                     't_per_anchor': t_per_anchor,
@@ -264,15 +267,15 @@ def train(model, trainer, train_loader, valid_loader, test_loader, resume):
         os.remove('model.ckpt')
 
     if resume:
-        wandb.restore('model.ckpt', root=os.getcwd(), run_path='princepi/HPCS/runs/1zvcmsdj')
+        wandb.restore('model.ckpt', root=os.getcwd(), run_path='liubigli-tcp/HPCS/runs/dwhnnf5v')
         model = model.load_from_checkpoint('model.ckpt')
-
-    trainer.fit(model, train_loader, valid_loader)
-
-    print("End Training")
-
-    trainer.save_checkpoint('model.ckpt')
-    wandb.save('model.ckpt')
+    #
+    # trainer.fit(model, train_loader, valid_loader)
+    #
+    # print("End Training")
+    #
+    # trainer.save_checkpoint('model.ckpt')
+    # wandb.save('model.ckpt')
 
     trainer.test(model, test_loader)
 

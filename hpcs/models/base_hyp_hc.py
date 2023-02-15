@@ -20,6 +20,7 @@ class BaseSimilarityHypHC(pl.LightningModule):
     def __init__(self, nn_feat: torch.nn.Module,
                  nn_emb: Optional[torch.nn.Module],
                  euclidean_size: int = 4,
+                 hyp_size: int = 4,
                  lr: float = 1e-3,
                  margin: float = 0.5,
                  t_per_anchor: int = 50,
@@ -34,11 +35,11 @@ class BaseSimilarityHypHC(pl.LightningModule):
                  plot_inference: bool = True):
 
         super(BaseSimilarityHypHC, self).__init__()
-        self.save_hyperparameters()
         self.nn_feat = nn_feat
         self.nn_emb = nn_emb
         self.lr = lr
         self.euclidean_size = euclidean_size
+        self.hyp_size = hyp_size
         self.margin = margin
         self.t_per_anchor = t_per_anchor
         self.fraction = fraction
@@ -60,9 +61,11 @@ class BaseSimilarityHypHC(pl.LightningModule):
                                                     temperature=self.temperature,
                                                     anneal_factor=self.anneal_factor,
                                                     num_class=self.num_class,
-                                                    euclidean_size=self.euclidean_size,
+                                                    embedding_size=self.euclidean_size,
                                                     miner=self.miner,
                                                     cosface=self.cosface)
+        self.save_hyperparameters()
+
 
     def _decode_linkage(self, leaves_embeddings):
         """Build linkage matrix from leaves' embeddings. Assume points are normalized to same radius."""

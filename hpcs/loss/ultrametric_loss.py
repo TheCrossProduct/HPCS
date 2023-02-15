@@ -15,7 +15,7 @@ from hpcs.distances import hyp_lca, CosineSimilarity
 
 class MetricHyperbolicLoss(BaseMetricLossFunction):
     def __init__(self, margin: float = 1.0, t_per_anchor: int = 50, fraction: float = 1.2, scale: Union[float, torch.tensor, torch.nn.Parameter] = 1e-3,
-                 temperature: float = 0.05, anneal_factor: float = 0.5, num_class: int = 4, euclidean_size: int = 4,
+                 temperature: float = 0.05, anneal_factor: float = 0.5, num_class: int = 4, embedding_size: int = 4,
                  cosface: bool = True, miner: bool = False):
         super(MetricHyperbolicLoss, self).__init__()
         self.margin = margin
@@ -25,23 +25,22 @@ class MetricHyperbolicLoss(BaseMetricLossFunction):
         self.temperature = temperature
         self.anneal_factor = anneal_factor
         self.num_class = num_class
-        self.euclidean_size = euclidean_size
+        self.embedding_size = embedding_size
         self.cosface = cosface
         self.miner = miner
-
         self.distance_sim = CosineSimilarity()
 
         if self.miner:
             self.hyp_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=0, t_per_anchor=self.t_per_anchor, fraction=self.fraction, type_of_triplets='easy')
 
         if self.cosface:
-            self.loss_cosface = CosFaceLoss(num_classes=self.num_class, embedding_size=self.euclidean_size, margin=0.35, scale=2)
+            self.loss_cosface = CosFaceLoss(num_classes=self.num_class, embedding_size=self.embedding_size, margin=0.35, scale=2)
         else:
             self.triplet_miner = RandomTripletMarginMiner(distance=self.distance_sim, margin=self.margin, t_per_anchor=self.t_per_anchor, fraction=self.fraction, type_of_triplets='semihard')
             self.loss_triplet = TripletMarginLoss(distance=self.distance_sim, margin=self.margin)
 
     def get_triplets(self, n_samples):
-        n_triplets = self.t_per_anchor * (n_samples * (n_samples - 1 ) // 2)
+        n_triplets = self.t_per_anchor * (n_samples * (n_samples - 1) // 2)
 
         ij = torch.combinations(torch.arange(n_samples), r=2)
         ij = ij.repeat_interleave(self.t_per_anchor, dim=0)
@@ -128,7 +127,7 @@ class MetricHyperbolicLoss(BaseMetricLossFunction):
 class HierarchicalMetricHyperbolicLoss(MetricHyperbolicLoss):
     def __init__(self, margin: float = 1.0, t_per_anchor: int = 50, fraction: float = 1.2, scale: Union[
         float, torch.tensor, torch.nn.Parameter] = 1e-3, temperature: float = 0.05, anneal_factor: float = 0.5,
-                 num_class: int = 4, euclidean_size: int = 4, miner: bool = False, hierarchy_list: list = []):
+                 num_class: int = 4, embedding_size: int = 4, miner: bool = False, hierarchy_list: list = []):
         super(HierarchicalMetricHyperbolicLoss, self).__init__(margin=margin,
                                                                t_per_anchor=t_per_anchor,
                                                                fraction=fraction,
@@ -136,7 +135,7 @@ class HierarchicalMetricHyperbolicLoss(MetricHyperbolicLoss):
                                                                temperature=temperature,
                                                                anneal_factor=anneal_factor,
                                                                num_class=num_class,
-                                                               euclidean_size=euclidean_size,
+                                                               embedding_size=embedding_size,
                                                                cosface=True,
                                                                miner=miner)
         self.hierarchy_list = hierarchy_list

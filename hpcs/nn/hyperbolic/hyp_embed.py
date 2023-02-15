@@ -9,6 +9,9 @@ class ExpMap(nn.Module):
     def forward(self, x):
         return expmap_1(x, torch.zeros_like(x))
 
+class HypNN(nn.Module):
+    def __init__(self):
+        pass
 
 class MLPExpMap(nn.Module):
     def __init__(self, input_feat: int, out_feat: int, bias: bool = False, negative_slope: float = 0.2, dropout: float = 0.0):
