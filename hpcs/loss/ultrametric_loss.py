@@ -97,7 +97,7 @@ class MetricHyperbolicLoss(BaseMetricLossFunction):
         loss_hyperbolic = self.compute_hyp(x_poincare, labels)
 
         if self.cosface:
-            loss_metric = self.loss_cosface(x_euclidean, labels.long())
+            loss_metric = self.loss_cosface(x_poincare, labels.long())
         else:
             triplet_indices_tuple = self.triplet_miner(x_poincare, labels)
             loss_metric = self.loss_triplet_sim(x_poincare, labels, triplet_indices_tuple)

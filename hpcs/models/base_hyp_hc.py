@@ -61,7 +61,7 @@ class BaseSimilarityHypHC(pl.LightningModule):
                                                     temperature=self.temperature,
                                                     anneal_factor=self.anneal_factor,
                                                     num_class=self.num_class,
-                                                    embedding_size=self.euclidean_size,
+                                                    embedding_size=self.hyp_size,
                                                     miner=self.miner,
                                                     cosface=self.cosface)
         self.save_hyperparameters()

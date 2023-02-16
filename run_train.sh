@@ -1,17 +1,18 @@
 python train.py \
-  -dataset 'shapenet' \
-  -category 'Airplane' \
-  -level 1 \
-  -fixed_points 256 \
+  -dataset 'partnet' \
+  -category 'Lamp' \
+  -level 3 \
+  -fixed_points 1024 \
   -model 'vn_dgcnn_partseg' \
-  -embedding 2 \
+  -eucl_embedding 41 \
+  -hyp_embedding 41 \
   -k 20 \
-  -margin 0.05 \
+  -margin 0.35 \
   -t_per_anchor 50 \
   -fraction 1.2 \
-  -temperature 1 \
-  -epochs 20 \
-  -batch 6 \
-  -lr 0.005 \
+  -temperature 0.10 \
+  -epochs 40 \
+  -batch 2 \
+  -lr 0.05 \
   -accelerator 'gpu' \
-  -trade_off 0.02
+  -trade_off 0.10

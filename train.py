@@ -30,8 +30,8 @@ def read_configuration():
     parser.add_argument('--model', '-model', default='vn_dgcnn_partseg', type=str, help='model to use to extract features')
     parser.add_argument('--train_rotation', '-train_rotation', default='so3', type=str, help='type of rotation augmentation for train')
     parser.add_argument('--test_rotation', '-test_rotation', default='so3', type=str, help='type of rotation augmentation for test')
-    parser.add_argument('--eucl-embedding', default=2, type=int, help='dimension of euclidean space')
-    parser.add_argument('--hyp-embedding', default=2, type=int, help='dimension of poincare space')
+    parser.add_argument('--eucl_embedding', '-eucl_embedding', default=2, type=int, help='dimension of euclidean space')
+    parser.add_argument('--hyp_embedding', '-hyp_embedding', default=2, type=int, help='dimension of poincare space')
     parser.add_argument('--k', '-k', default=10, type=int, help='if model dgcnn, k is the number of neigh to take into account')
     parser.add_argument('--margin', '-margin', default=0.05, type=float, help='margin value to use in miner loss')
     parser.add_argument('--t_per_anchor', '-t_per_anchor', default=50, type=int, help='margin value to use in miner loss')
@@ -47,7 +47,7 @@ def read_configuration():
     parser.add_argument('--anneal_step', '-anneal_step', default=0, type=int, help='use annealing each n step')
     parser.add_argument('--patience', '-patience', default=50, type=int, help='patience value for early stopping')
     parser.add_argument('--trade_off', '-trade_off', default=1.0, type=float, help='control trade-off between two losses')
-    parser.add_argument('--no-miner', action='store_false', help='triplet miner for hyperbolic loss')
+    parser.add_argument('--miner', action='store_false', help='triplet miner for hyperbolic loss')
     parser.add_argument('--triplet-sim', action='store_true', help='cosface / triplet loss')
     parser.add_argument('--class_vector', action='store_true', help='class vector to decode')
     parser.add_argument('--hierarchical', action='store_true', help='hierarchical loss')
@@ -117,7 +117,7 @@ def configure(args):
     anneal_step = args.anneal_step
     patience = args.patience
     trade_off = args.trade_off
-    miner = args.no_miner
+    miner = args.miner
     cosface = not args.triplet_sim
     class_vector = args.class_vector
     hierarchical = args.hierarchical
@@ -133,6 +133,13 @@ def configure(args):
         train_dataset = ShapeNetDataset(root=data_folder, npoints=fixed_points, split='train', class_choice=category)
         valid_dataset = ShapeNetDataset(root=data_folder, npoints=fixed_points, split='val', class_choice=category)
         test_dataset = ShapeNetDataset(root=data_folder, npoints=fixed_points, split='test', class_choice=category)
+
+        if category is None:
+            num_categories = 16
+            num_class = 50
+        else:
+            num_categories = 16
+            num_class = len(train_dataset.seg_classes[category])
 
     elif dataset == 'partnet':
         data_folder = 'data/PartNet/sem_seg_h5/'
@@ -155,18 +162,12 @@ def configure(args):
         test_dataset = PartNetDataset(list_test, fixed_points)
 
         with open('data/PartNet/after_merging_label_ids/%s-level-%d.txt' % (category, level), 'r') as fin:
+            num_categories = 1
             num_class = len(fin.readlines()) + 1
             print('Number of Classes: %d' % num_class)
 
     else:
         raise KeyError(f"Not available implementation for dataset: {dataset}")
-
-    if category is None:
-        num_categories = 16
-        num_class = 50
-    else:
-        num_categories = 16
-        num_class = len(train_dataset.seg_classes[category])
 
     train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers, drop_last=True)
     valid_loader = DataLoader(valid_dataset, batch_size=batch, shuffle=False, num_workers=num_workers, drop_last=True)
@@ -229,25 +230,6 @@ def configure(args):
         raise KeyError(f"Not available implementation for dataset: {dataset}")
 
     logger = WandbLogger(name=dataset, save_dir=os.path.join(log), project='HPCS', log_model=True)
-    model_params = {'dataset': dataset,
-                    'category': category,
-                    'level': level if dataset == 'partnet' else 'coarse',
-                    'fixed_points': fixed_points,
-                    'model': model_name,
-                    'eucl_embedding': eucl_embedding,
-                    'hyp_embedding': hyp_embedding,
-                    'k': k,
-                    'margin': margin,
-                    't_per_anchor': t_per_anchor,
-                    'fraction': fraction,
-                    'temperature': temperature,
-                    'epochs': epochs,
-                    'batch': batch,
-                    'lr': lr,
-                    'accelerator': accelerator,
-                    'trade_off': trade_off}
-    print(model_params)
-
     savedir = os.path.join(logger.save_dir, logger.name, 'version_' + str(logger.version), 'checkpoints')
     checkpoint_callback = ModelCheckpoint(dirpath=savedir, verbose=True)
     early_stop_callback = EarlyStopping(
@@ -273,7 +255,7 @@ def train(model, trainer, train_loader, valid_loader, test_loader, resume):
         os.remove('model.ckpt')
 
     if resume:
-        wandb.restore('model.ckpt', root=os.getcwd(), run_path='liubigli-tcp/HPCS/runs/dwhnnf5v')
+        wandb.restore('model.ckpt', root=os.getcwd(), run_path='princepi/HPCS/runs/1zvcmsdj')
         model = model.load_from_checkpoint('model.ckpt')
 
     trainer.fit(model, train_loader, valid_loader)
