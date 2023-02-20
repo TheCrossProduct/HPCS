@@ -6,6 +6,10 @@ import pytorch_lightning as pl
 
 from torch.nn import functional as F
 from torch.optim import lr_scheduler
+from torchmetrics import Accuracy
+from torchmetrics.classification import MulticlassJaccardIndex
+
+from pytorch_metric_learning.utils import common_functions as c_f, loss_and_miner_utils as lmu
 
 from scipy.cluster.hierarchy import linkage
 
@@ -14,6 +18,7 @@ from hpcs.distances.poincare import project
 from hpcs.loss.ultrametric_loss import MetricHyperbolicLoss
 from hpcs.utils.viz import plot_hyperbolic_eval
 from hpcs.utils.scores import get_optimal_k
+from hpcs.utils.data import to_categorical
 
 
 class BaseSimilarityHypHC(pl.LightningModule):
@@ -64,6 +69,8 @@ class BaseSimilarityHypHC(pl.LightningModule):
                                                     embedding_size=self.hyp_size,
                                                     miner=self.miner,
                                                     cosface=self.cosface)
+        self.accuracy = Accuracy(task='multiclass', num_classes=self.num_class, top_k=1)
+        self.iou = MulticlassJaccardIndex(num_classes=self.num_class)
         self.save_hyperparameters()
 
 
@@ -73,6 +80,19 @@ class BaseSimilarityHypHC(pl.LightningModule):
         leaves_embeddings = project(leaves_embeddings).detach().cpu()
         Z = linkage(leaves_embeddings, method='complete', metric='cosine')
         return Z
+
+    def compute_accuracy(self, embeddings, labels):
+        # labels_reshape = labels.contiguous().reshape(-1)
+        logits = self.metric_hyp_loss.get_logits(embeddings, labels)
+        logits = F.softmax(logits)
+
+        return self.accuracy(logits, labels)
+
+    def compute_iou(self, embeddings, labels):
+        logits = self.metric_hyp_loss.get_logits(embeddings, labels)
+        logits = F.softmax(logits)
+
+        return self.iou(logits, labels)
 
     def compute_losses(self, x_euclidean, x_poincare, labels):
         labels = labels.view(-1, 1)[:, 0]
@@ -99,15 +119,21 @@ class BaseSimilarityHypHC(pl.LightningModule):
         x_poincare_reshape = x_poincare.contiguous().view(-1, x_poincare.shape[-1])
 
         losses = self.compute_losses(x_euclidean_reshape, x_poincare_reshape, pts_labels)
-
+        if hasattr(self.metric_hyp_loss, 'loss_cosface'):
+            y_true = pts_labels.contiguous().reshape(-1)
+            acc = self.compute_accuracy(x_euclidean_reshape, y_true.long())
+            iou = self.compute_iou(x_euclidean_reshape, y_true.long())
+            metrics = {'acc': acc, 'iou': iou}
+        else:
+            metrics = {}
         if testing:
             linkage_matrix = []
             for object_idx in range(points.size(0)):
                 Z = self._decode_linkage(x_poincare[object_idx])
                 linkage_matrix.append(Z)
-            return losses, x_euclidean, x_poincare, linkage_matrix, points, pts_labels
+            return losses, metrics, x_euclidean, x_poincare, linkage_matrix, points, pts_labels
         else:
-            return losses
+            return losses, metrics
 
     def configure_optimizers(self):
         optim = RAdam(self.parameters(), lr=self.lr)
@@ -125,13 +151,20 @@ class BaseSimilarityHypHC(pl.LightningModule):
         return [optim], scheduler
 
     def training_step(self, batch, batch_idx):
-        losses = self.forward(batch, testing=False)
+        losses, metrics = self.forward(batch, testing=False)
         losses['total_loss'] = self.sum_losses(losses)
 
         self.log("train_loss", losses)
+        train_metrics = {}
+        for key in metrics:
+            out_key = "train_" + key
+            train_metrics[out_key] = metrics[key]
+            self.log(out_key, metrics[key], prog_bar=True)
+
         self.log("scale", self.scale)
         self.log("temperature", self.temperature)
-        return {'loss': losses['total_loss'], 'progress_bar': losses}
+
+        return {'loss': losses['total_loss'], **train_metrics}
 
     def training_epoch_end(self, outputs):
         if self.current_epoch and self.anneal_step > 0 and self.current_epoch % self.anneal_step == 0:
@@ -140,14 +173,20 @@ class BaseSimilarityHypHC(pl.LightningModule):
             print("Temperature Value: ", self.temperature)
 
     def validation_step(self, batch, batch_idx):
-        val_losses = self.forward(batch, testing=False)
+        val_losses, metrics = self.forward(batch, testing=False)
         val_loss = self.sum_losses(val_losses)
 
+        val_metrics = {}
+        for key in metrics:
+            out_key = "val_" + key
+            val_metrics[out_key] = metrics[key]
+            self.log(out_key, metrics[key])
+
         self.log("val_loss", val_loss)
-        return {'val_loss': val_loss}
+        return {'val_loss': val_loss, **val_metrics}
 
     def test_step(self, batch, batch_idx):
-        test_losses, x_euclidean, x_poincare, linkage_matrix, points, targets = self.forward(batch, testing=True)
+        test_losses, metrics, x_euclidean, x_poincare, linkage_matrix, points, targets = self.forward(batch, testing=True)
         test_loss = self.sum_losses(test_losses)
 
         indexes = []
@@ -170,4 +209,11 @@ class BaseSimilarityHypHC(pl.LightningModule):
 
         self.log("score", score)
         self.log("test_loss", test_loss)
-        return {'test_loss': test_loss}
+
+        test_metrics = {}
+        for key in metrics:
+            out_key = "test_" + key
+            test_metrics[out_key] = metrics[key]
+            self.log(out_key, metrics[key])
+
+        return {'test_loss': test_loss, **test_metrics}

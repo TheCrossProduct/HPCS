@@ -92,6 +92,24 @@ class MetricHyperbolicLoss(BaseMetricLossFunction):
 
         return loss_hyperbolic
 
+    def get_logits(self, embeddings, labels):
+        if hasattr(self, 'loss_cosface'):
+            dtype, device = embeddings.dtype, embeddings.device
+            self.loss_cosface.cast_types(dtype, device)
+            mask = self.loss_cosface.get_target_mask(embeddings, labels)
+            cosine = self.loss_cosface.get_cosine(embeddings)
+            cosine_of_target_classes = cosine[mask == 1]
+            modified_cosine_of_target_classes = self.loss_cosface.modify_cosine_of_target_classes(
+                cosine_of_target_classes
+            )
+            diff = (modified_cosine_of_target_classes - cosine_of_target_classes).unsqueeze(
+                1
+            )
+            logits = cosine + (mask * diff)
+            logits = self.loss_cosface.scale_logits(logits, embeddings)
+            return logits
+        else:
+            raise ValueError("Cannot get logits since this class doesn't use any CosFaceLoss")
     def compute_loss(self, x_euclidean, x_poincare, labels, *args):
 
         loss_hyperbolic = self.compute_hyp(x_poincare, labels)
