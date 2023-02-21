@@ -110,6 +110,7 @@ class MetricHyperbolicLoss(BaseMetricLossFunction):
             return logits
         else:
             raise ValueError("Cannot get logits since this class doesn't use any CosFaceLoss")
+
     def compute_loss(self, x_euclidean, x_poincare, labels, *args):
 
         loss_hyperbolic = self.compute_hyp(x_poincare, labels)
