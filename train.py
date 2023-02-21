@@ -24,7 +24,7 @@ def read_configuration():
     parser = argparse.ArgumentParser()
     parser.add_argument('--log', default='logs', type=str, help='dirname for logs')
     parser.add_argument('--dataset', '-dataset', default='shapenet', type=str, help='name of dataset to use')
-    parser.add_argument('--category', '-category', default='Airplane', type=str, help='category from dataset')
+    parser.add_argument('--category', '-category', default=None, type=str, help='category from dataset')
     parser.add_argument('--level', '-level', default=3, type=int, help='granularity level of partnet object')
     parser.add_argument('--fixed_points', '-fixed_points', default=512, type=int, help='points retained from point cloud')
     parser.add_argument('--model', '-model', default='vn_dgcnn_partseg', type=str, help='model to use to extract features')
@@ -128,6 +128,7 @@ def configure(args):
     wandb_mode = args.wandb
 
     if dataset == 'shapenet':
+        print(f"Category: {category}")
         data_folder = 'data/ShapeNet/raw'
         # data_folder = '/gpfsscratch/rech/qpj/uyn98cq/ShapeNet/raw'
         train_dataset = ShapeNetDataset(root=data_folder, npoints=fixed_points, split='train', class_choice=category)
