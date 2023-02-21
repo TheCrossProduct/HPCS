@@ -121,8 +121,8 @@ class BaseSimilarityHypHC(pl.LightningModule):
         losses = self.compute_losses(x_euclidean_reshape, x_poincare_reshape, pts_labels)
         if hasattr(self.metric_hyp_loss, 'loss_cosface'):
             y_true = pts_labels.contiguous().reshape(-1)
-            acc = self.compute_accuracy(x_euclidean_reshape, y_true.long())
-            iou = self.compute_iou(x_euclidean_reshape, y_true.long())
+            acc = self.compute_accuracy(x_poincare_reshape, y_true.long())
+            iou = self.compute_iou(x_poincare_reshape, y_true.long())
             metrics = {'acc': acc, 'iou': iou}
         else:
             metrics = {}
