@@ -54,7 +54,7 @@ def read_configuration():
     parser.add_argument('--hierarchy_list', '-hierarchy_list', default=[], type=list, help='precomputed hierarchy list')
     parser.add_argument('--plot_inference', action='store_true', help='plot visualizations during testing')
     parser.add_argument('--pretrained', action='store_true', help='load pretrained model')
-    parser.add_argument('--resume', action='store_true', help='resume training on model')
+    parser.add_argument('--resume', type=str, help='path to wandb model to resume')
     parser.add_argument('--wandb', '-wandb', default='online', type=str, help='Online/Offline WandB mode (Useful in JeanZay)')
     args = parser.parse_args()
     return args
@@ -73,12 +73,20 @@ def configure_feature_extractor(model_name, num_class, out_features, num_categor
         raise ValueError(f"Not implemented for model_name {model_name}")
 
     if pretrained:
-        model_path = osp.realpath('model.partseg.vn_dgcnn.aligned.t7')
-        checkpoint = torch.load(model_path)
-        new_state_dict = OrderedDict()
-        for key, value in checkpoint.items():
-            name = key.replace('module.', '')
-            new_state_dict[name] = value
+        if num_categories == 1:
+            model_path = osp.realpath('model.partseg.vn_dgcnn.aligned.t7')
+            checkpoint = torch.load(model_path)
+            new_state_dict = OrderedDict()
+            for key, value in checkpoint.items():
+                name = key.replace('module.', '')
+                new_state_dict[name] = value
+        else:
+            print("LOADING PRETRAINED MODEL FROM: 'checkpoints/shapenet/best_model.pth'")
+            checkpoint = torch.load('checkpoints/shapenet/best_model.pth')
+            new_state_dict = checkpoint['model_state_dict']
+            if out_features != num_class:
+                new_state_dict['conv11.weight'] = nn.conv11.weight
+
         nn.load_state_dict(new_state_dict, strict=False)
     return nn
 
@@ -256,7 +264,7 @@ def train(model, trainer, train_loader, valid_loader, test_loader, resume):
         os.remove('model.ckpt')
 
     if resume:
-        wandb.restore('model.ckpt', root=os.getcwd(), run_path='princepi/HPCS/runs/1zvcmsdj')
+        wandb.restore('model.ckpt', root=os.getcwd(), run_path=resume)
         model = model.load_from_checkpoint('model.ckpt')
 
     trainer.fit(model, train_loader, valid_loader)
