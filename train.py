@@ -54,7 +54,7 @@ def read_configuration():
     parser.add_argument('--hierarchy_list', '-hierarchy_list', default=[], type=list, help='precomputed hierarchy list')
     parser.add_argument('--plot_inference', action='store_true', help='plot visualizations during testing')
     parser.add_argument('--pretrained', action='store_true', help='load pretrained model')
-    parser.add_argument('--resume', type=str, help='path to wandb model to resume')
+    parser.add_argument('--resume', action='store_true', help='resume training on model')
     parser.add_argument('--wandb', '-wandb', default='online', type=str, help='Online/Offline WandB mode (Useful in JeanZay)')
     args = parser.parse_args()
     return args
