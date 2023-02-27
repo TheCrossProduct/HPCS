@@ -50,7 +50,7 @@ def read_configuration():
     parser.add_argument('--miner', action='store_false', help='triplet miner for hyperbolic loss')
     parser.add_argument('--triplet-sim', action='store_true', help='cosface / triplet loss')
     parser.add_argument('--class_vector', action='store_true', help='class vector to decode')
-    parser.add_argument('--hierarchical', action='store_true', help='hierarchical loss')
+    parser.add_argument('--hierarchical', action='store_false', help='hierarchical loss')
     parser.add_argument('--hierarchy_list', '-hierarchy_list', default=[], type=list, help='precomputed hierarchy list')
     parser.add_argument('--plot_inference', action='store_true', help='plot visualizations during testing')
     parser.add_argument('--pretrained', action='store_true', help='load pretrained model')
@@ -151,7 +151,7 @@ def configure(args):
                 list_train = os.path.join(data_folder, '%s-%d' % (category, i+1), 'train_files.txt')
                 if os.path.exists(list_train):
                     levels.append(i+1)
-            level = levels[-1]
+            # level = levels[-1]
             hierarchy_list = get_hierarchy_list(category, levels)
 
         list_train = os.path.join(data_folder, '%s-%d' % (category, level), 'train_files.txt')
@@ -245,7 +245,7 @@ def configure(args):
                          max_epochs=epochs,
                          callbacks=[early_stop_callback, checkpoint_callback, lr_monitor],
                          logger=logger,
-                         limit_test_batches=10
+                         # limit_test_batches=10
                          )
 
     return model, trainer, train_loader, valid_loader, test_loader, resume, wandb_mode
@@ -256,7 +256,7 @@ def train(model, trainer, train_loader, valid_loader, test_loader, resume):
         os.remove('model.ckpt')
 
     if resume:
-        wandb.restore('model.ckpt', root=os.getcwd(), run_path='princepi/HPCS/runs/1zvcmsdj')
+        wandb.restore('model.ckpt', root=os.getcwd(), run_path='hpcs/HPCS/runs/ydqe1n8h')
         model = model.load_from_checkpoint('model.ckpt')
 
     trainer.fit(model, train_loader, valid_loader)

@@ -139,7 +139,7 @@ class BaseSimilarityHypHC(pl.LightningModule):
         optim = RAdam(self.parameters(), lr=self.lr)
         scheduler = [
             {
-                'scheduler': lr_scheduler.ReduceLROnPlateau(optim, mode='min', factor=0.5, patience=2,
+                'scheduler': lr_scheduler.ReduceLROnPlateau(optim, mode='min', factor=0.5, patience=4,
                                                             min_lr=1e-6, verbose=True),
                 'monitor': 'val_loss',
                 'interval': 'epoch',

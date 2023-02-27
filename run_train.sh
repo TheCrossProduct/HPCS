@@ -1,18 +1,18 @@
 python train.py \
   -dataset 'partnet' \
-  -category 'Lamp' \
+  -category 'Faucet' \
   -level 3 \
   -fixed_points 1024 \
   -model 'vn_dgcnn_partseg' \
-  -eucl_embedding 41 \
-  -hyp_embedding 41 \
+  -eucl_embedding 4 \
+  -hyp_embedding 4 \
   -k 20 \
   -margin 0.35 \
   -t_per_anchor 50 \
   -fraction 1.2 \
-  -temperature 0.10 \
+  -temperature 0.1 \
   -epochs 40 \
-  -batch 2 \
+  -batch 8 \
   -lr 0.05 \
   -accelerator 'gpu' \
-  -trade_off 0.10
+  -trade_off 0.1

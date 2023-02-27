@@ -72,7 +72,7 @@ def plot_cloud(xyz,
         plotter = pv.Plotter(title=title)
 
     poly = pv.PolyData(xyz)
-    plotter.add_mesh(poly, color=color, scalars=scalars, cmap=cmap, rgb=rgb, point_size=point_size, clim=clim)
+    plotter.add_mesh(poly, color=color, render_points_as_spheres=True, scalars=scalars, cmap=cmap, rgb=rgb, point_size=point_size, clim=clim)
 
     if add_scalarbar and not rgb:
         plotter.add_scalar_bar()
@@ -306,6 +306,7 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, 
 
     n_plots = 5
 
+    # plotter = BackgroundPlotter(title='Prediction')
     plotter = pv.Plotter(title='Prediction', shape=(1, 5), window_size=(2000, 400))
 
     idx = 1
@@ -328,8 +329,7 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, 
     plotter.add_text(f'Pred: Score@{k}: {score:.3f}')
     data = pv.PolyData(pts)
     cmap_pred = list(COLORS[np.unique(y_pred) % len(COLORS)])
-    plotter.add_mesh(data, scalars=y_pred, cmap=cmap_pred, render_points_as_spheres=True, point_size=5.0,
-                     scalar_bar_args={'title': 'Pred Classes'})
+    plotter.add_mesh(data, scalars=y_pred, cmap=cmap_pred, render_points_as_spheres=True, point_size=5.0, scalar_bar_args={'title': 'Pred Classes'})
     plotter.camera_position = 'xy'
     idx += 1
     plotter.subplot(0, 2)
