@@ -18,7 +18,6 @@ class VN_DGCNN_partseg(nn.Module):
         self.bn8 = nn.BatchNorm1d(256)
         self.bn9 = nn.BatchNorm1d(256)
         self.bn10 = nn.BatchNorm1d(128)
-        self.bn11 = nn.BatchNorm1d(self.out_features)
 
         self.conv1 = VNLinearLeakyReLU(2, 64 // 3)
         self.conv2 = VNLinearLeakyReLU(64 // 3, 64 // 3)
