@@ -16,4 +16,6 @@ python train.py \
   --lr 0.05 \
   --accelerator 'gpu' \
   --trade_off 0.10 \
-  --resume 'liubigli-tcp/HPCS/runs/zu8e782y'
+  --resume 'liubigli-tcp/HPCS/runs/zu8e782y' \
+  --infer \
+#  --plot_inference

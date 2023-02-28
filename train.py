@@ -54,7 +54,8 @@ def read_configuration():
     parser.add_argument('--hierarchy_list', '-hierarchy_list', default=[], type=list, help='precomputed hierarchy list')
     parser.add_argument('--plot_inference', action='store_true', help='plot visualizations during testing')
     parser.add_argument('--pretrained', action='store_true', help='load pretrained model')
-    parser.add_argument('--resume', type=str, help='path to wandb model to resume')
+    parser.add_argument('--infer', action='store_true', help='set this flag if you want onyl infer')
+    parser.add_argument('--resume', type=str, default='', help='path to wandb model to resume')
     parser.add_argument('--wandb', '-wandb', default='online', type=str, help='Online/Offline WandB mode (Useful in JeanZay)')
     args = parser.parse_args()
     return args
@@ -133,6 +134,7 @@ def configure(args):
     plot_inference = args.plot_inference
     pretrained = args.pretrained
     resume = args.resume
+    infer = args.infer
     wandb_mode = args.wandb
 
     if dataset == 'shapenet':
@@ -180,7 +182,7 @@ def configure(args):
 
     train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True, num_workers=num_workers, drop_last=True)
     valid_loader = DataLoader(valid_dataset, batch_size=batch, shuffle=False, num_workers=num_workers, drop_last=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch, shuffle=False, num_workers=num_workers, drop_last=True)
+    test_loader = DataLoader(test_dataset, batch_size=batch, shuffle=False, num_workers=num_workers, drop_last=False)
 
     nn_feat = configure_feature_extractor(model_name=model_name,
                                           num_class=num_class,
@@ -249,30 +251,35 @@ def configure(args):
         mode='min')
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
+    limit_test_batches = 10 if not infer else None
     trainer = pl.Trainer(accelerator=accelerator,
                          max_epochs=epochs,
                          callbacks=[early_stop_callback, checkpoint_callback, lr_monitor],
                          logger=logger,
-                         limit_test_batches=10
+                         limit_test_batches=limit_test_batches
                          )
 
     return model, trainer, train_loader, valid_loader, test_loader, resume, wandb_mode
 
 
-def train(model, trainer, train_loader, valid_loader, test_loader, resume):
+def train(model, trainer, train_loader, valid_loader, test_loader, resume, infer, plot=False):
     if os.path.exists('model.ckpt'):
         os.remove('model.ckpt')
 
     if resume:
+        print(f"Resuming model from {resume}")
         wandb.restore('model.ckpt', root=os.getcwd(), run_path=resume)
         model = model.load_from_checkpoint('model.ckpt')
+        model.plot_inference=plot
 
-    trainer.fit(model, train_loader, valid_loader)
 
-    print("End Training")
+    if not infer:
+        trainer.fit(model, train_loader, valid_loader)
 
-    trainer.save_checkpoint('model.ckpt')
-    wandb.save('model.ckpt')
+        print("End Training")
+
+        trainer.save_checkpoint('model.ckpt')
+        wandb.save('model.ckpt')
 
     trainer.test(model, test_loader)
 
@@ -282,4 +289,4 @@ if __name__ == "__main__":
 
     wandb.init(project='HPCS', mode=args.wandb, config=args)
     model, trainer, train_loader, valid_loader, test_loader, resume, wandb_mode = configure(args)
-    train(model, trainer, train_loader, valid_loader, test_loader, resume)
+    train(model, trainer, train_loader, valid_loader, test_loader, resume, args.infer, args.plot_inference)
