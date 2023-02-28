@@ -52,7 +52,8 @@ class VN_DGCNN_partseg(nn.Module):
         self.conv10 = nn.Sequential(nn.Conv1d(256, 128, kernel_size=1, bias=False),
                                     self.bn10,
                                     nn.LeakyReLU(negative_slope=0.2))
-        self.conv11 = nn.Conv1d(128, self.out_features, kernel_size=1, bias=False)
+        self.conv11 = nn.Sequential(nn.Conv1d(128, self.out_features, kernel_size=1, bias=False),
+                                    self.bn11)
 
     def forward(self, x, l):
         batch_size = x.size(0)

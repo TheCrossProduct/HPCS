@@ -119,7 +119,7 @@ class MetricHyperbolicLoss(BaseMetricLossFunction):
             loss_metric = self.loss_cosface(x_poincare, labels.long())
         else:
             triplet_indices_tuple = self.triplet_miner(x_poincare, labels)
-            loss_metric = self.loss_triplet_sim(x_poincare, labels, triplet_indices_tuple)
+            loss_metric = self.loss_triplet(x_poincare, labels, triplet_indices_tuple)
 
         return {
             "loss_hyp": {
@@ -158,13 +158,13 @@ class HierarchicalMetricHyperbolicLoss(MetricHyperbolicLoss):
                                                                cosface=True,
                                                                miner=miner)
         self.hierarchy_list = hierarchy_list
-        self.loss_cosface = HierarchicalCosFaceLoss(num_classes=self.num_class, embedding_size=self.euclidean_size,
-                                                    margin=0.35, scale=64, hierarchy_list=self.hierarchy_list)
+        self.loss_cosface = HierarchicalCosFaceLoss(num_classes=self.num_class, embedding_size=self.embedding_size,
+                                                    margin=0.35, scale=2, hierarchy_list=self.hierarchy_list)
 
     def compute_loss(self, x_euclidean, x_poincare, labels, *args):
         loss_hyperbolic = self.compute_hyp(x_poincare, labels)
 
-        loss_metric = self.loss_cosface(x_euclidean, labels.long())
+        loss_metric = self.loss_cosface(x_poincare, labels.long())
 
         return {
             "loss_hyp": {

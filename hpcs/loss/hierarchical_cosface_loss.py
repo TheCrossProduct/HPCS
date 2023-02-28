@@ -23,7 +23,7 @@ def hierarchical_loss(probabilities, targets, hierarchy_list):
             for channel in branch:
                 summed_probabilities[:, channel:(channel + 1)] = summed_tree_branch_slice
 
-        level_loss = cross_entropy(summed_probabilities, targets)
+        level_loss = F.nll_loss(torch.log(summed_probabilities), targets)
         loss = loss + level_loss
     return loss
 
@@ -59,7 +59,6 @@ class HierarchicalCosFaceLoss(LargeMarginSoftmaxLoss):
         c_f.ref_not_supported(embeddings, labels, ref_emb, ref_labels)
         dtype, device = embeddings.dtype, embeddings.device
         self.cast_types(dtype, device)
-        indices_tuple = None
         miner_weights = lmu.convert_to_weights(indices_tuple, labels, dtype=dtype)
         mask = self.get_target_mask(embeddings, labels)
         cosine = self.get_cosine(embeddings)
@@ -72,8 +71,9 @@ class HierarchicalCosFaceLoss(LargeMarginSoftmaxLoss):
         )
         logits = cosine + (mask * diff)
         logits = self.scale_logits(logits, embeddings)
+        probabilities = F.softmax(logits, dim=1)
 
-        loss_hier = hierarchical_loss(logits, labels, self.hierarchy_list)
+        loss_hier = hierarchical_loss(probabilities, labels, self.hierarchy_list)
 
         miner_weighted_loss = loss_hier * miner_weights
         loss_dict = {
