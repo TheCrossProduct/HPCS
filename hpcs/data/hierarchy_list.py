@@ -13,7 +13,7 @@ def get_hierarchy_list(category, levels):
 
 
 def get_leaves(category):
-    with open('data/PartNet/after_merging_label_ids/%s-hier.txt' % (category), 'r') as fin:
+    with open('data/PartNet/after_merging_label_ids/%s.txt' % (category), 'r') as fin:
         lines_hier = fin.readlines()
         leaves = []
         leaf_nodes = []

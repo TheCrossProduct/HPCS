@@ -28,7 +28,7 @@ def configure_hyperbolic_embedder(input_features: int, output_features: int):
         return MLPExpMap(input_feat=input_features, out_feat=output_features)
 
 
-def configure(config):
+def configure(config, shapes):
     dataset = config['dataset']['value']
     model_name = config['model']['value']
     train_rotation = config['train_rotation']['value']
@@ -118,7 +118,7 @@ def configure(config):
 
     trainer = pl.Trainer(accelerator=accelerator,
                          max_epochs=-1,
-                         limit_test_batches=10
+                         limit_test_batches=shapes
                          )
 
     return model, trainer
