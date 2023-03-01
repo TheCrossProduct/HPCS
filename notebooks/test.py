@@ -1,11 +1,12 @@
+import os
+
 import pytorch_lightning as pl
 
 from hpcs.models import ShapeNetHypHC, PartNetHypHC
-
 from hpcs.nn.dgcnn import DGCNN_partseg, VN_DGCNN_partseg
-
 from hpcs.nn.pointnet import POINTNET_partseg, VN_POINTNET_partseg
 from hpcs.nn.hyperbolic import ExpMap, MLPExpMap
+from hpcs.data.hierarchy_list import get_hierarchy_list
 
 
 def configure_feature_extractor(model_name, num_class, out_features, num_categories, k, dropout, pretrained):
@@ -30,6 +31,7 @@ def configure_hyperbolic_embedder(input_features: int, output_features: int):
 
 def configure(config, shapes):
     dataset = config['dataset']['value']
+    category = config['category']['value']
     model_name = config['model']['value']
     train_rotation = config['train_rotation']['value']
     test_rotation = config['test_rotation']['value']
@@ -58,8 +60,18 @@ def configure(config, shapes):
 
     if dataset == 'shapenet':
         num_categories = 16
-    else:
+    elif dataset == 'partnet':
         num_categories = 1
+        data_folder = 'data/PartNet/sem_seg_h5/'
+
+        if hierarchical:
+            levels = []
+            for i in range(3):
+                list_train = os.path.join(data_folder, '%s-%d' % (category, i + 1), 'train_files.txt')
+                if os.path.exists(list_train):
+                    levels.append(i + 1)
+            hierarchy_list = get_hierarchy_list(category, levels)
+
 
     nn_feat = configure_feature_extractor(model_name=model_name,
                                           num_class=num_class,
