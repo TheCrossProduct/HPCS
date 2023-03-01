@@ -1,10 +1,12 @@
+import os
+import os.path as osp
 
 
 def get_hierarchy_list(category, levels):
     leaves, leaf_nodes, lines_hier = get_leaves(category)
     hierarchy_list = []
     for level in levels:
-        with open('data/PartNet/after_merging_label_ids/%s-level-%d.txt' % (category, level), 'r') as fin:
+        with open(osp.realpath(osp.join('..', 'hpcs/data/after_merging_label_ids/%s-level-%d.txt' % (category, level))), 'r') as fin:
             lines_level = fin.readlines()
             hierarchy_level = get_hierarchy_level(leaves, lines_level, lines_hier)
             hierarchy_list.append(hierarchy_level)
@@ -13,7 +15,7 @@ def get_hierarchy_list(category, levels):
 
 
 def get_leaves(category):
-    with open('data/PartNet/after_merging_label_ids/%s.txt' % (category), 'r') as fin:
+    with open(osp.realpath(osp.join('..', 'hpcs/data/after_merging_label_ids/%s.txt' % (category))), 'r') as fin:
         lines_hier = fin.readlines()
         leaves = []
         leaf_nodes = []
