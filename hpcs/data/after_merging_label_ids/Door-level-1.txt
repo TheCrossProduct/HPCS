@@ -1,2 +1,0 @@
-2 door_set/outside_frame leaf
-3 door_set/door subcomponents

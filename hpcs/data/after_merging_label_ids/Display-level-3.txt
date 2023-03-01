@@ -1,3 +1,0 @@
-2 display/display_screen subcomponents
-7 display/base/surface_base/base_support leaf
-8 display/base/surface_base/surface leaf

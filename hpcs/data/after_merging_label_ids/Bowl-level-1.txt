@@ -1,3 +1,0 @@
-2 bowl/container leaf
-3 bowl/containing_things leaf
-4 bowl/bottom leaf

@@ -13,10 +13,13 @@ def get_shapenet_path() -> Path:
     data_path = get_data_path()
     return data_path / 'ShapeNet' / 'raw'
 
-
 def get_partnet_path() -> Path:
     data_path = get_data_path()
     return data_path / 'PartNet' / 'sem_seg_h5'
+
+def get_hierarchy_path() -> Path:
+    data_path = get_data_path()
+    return data_path / 'PartNet' / 'after_merging_label_ids'
 
 def to_categorical(y, num_classes):
     """ 1-hot encodes a tensor """

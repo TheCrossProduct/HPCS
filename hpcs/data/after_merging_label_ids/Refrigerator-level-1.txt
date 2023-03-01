@@ -1,2 +1,0 @@
-2 refrigerator/body subcomponents
-9 refrigerator/base subtypes
