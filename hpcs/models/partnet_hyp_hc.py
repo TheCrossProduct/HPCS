@@ -81,7 +81,7 @@ class PartNetHypHC(BaseSimilarityHypHC):
         if trot is not None:
             points = trot.transform_points(points.cpu())
 
-        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        device = self.device
         points, label, targets = points.float().to(device), label.long().to(device), targets.long().to(device)
         points = points.transpose(2, 1)
 
