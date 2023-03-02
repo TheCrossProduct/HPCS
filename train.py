@@ -86,7 +86,12 @@ def configure_feature_extractor(model_name, num_class, out_features, num_categor
             checkpoint = torch.load('checkpoints/shapenet/best_model.pth')
             new_state_dict = checkpoint['model_state_dict']
             if out_features != num_class:
-                new_state_dict['conv11.weight'] = nn.conv11.weight
+                new_state_dict['conv11.0.weight'] = nn.conv11[0].weight
+                new_state_dict['conv11.1.weight'] = nn.conv11[1].weight
+                new_state_dict['conv11.1.bias'] = nn.conv11[1].bias
+                new_state_dict['conv11.1.running_mean'] = nn.conv11[1].running_mean
+                new_state_dict['conv11.1.running_var'] = nn.conv11[1].running_var
+                new_state_dict['conv11.1.num_batches_tracked'] = nn.conv11[1].num_batches_tracked
 
         nn.load_state_dict(new_state_dict, strict=False)
     return nn
