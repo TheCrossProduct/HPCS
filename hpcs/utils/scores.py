@@ -136,7 +136,7 @@ def get_optimal_k(y, linkage_matrix, index):
     best_pred = None
     y_true = remap_labels(y)
     y_true_clusters = len(torch.unique(y_true))
-    for k in range(1, n_clusters + 5):
+    for k in range(1, y_true_clusters + 5):
         # print(k)
         y_pred = fcluster(linkage_matrix, k, criterion='maxclust') - 1
         y_pred_clusters = len(torch.unique(torch.Tensor(y_pred)))
@@ -153,10 +153,12 @@ def get_optimal_k(y, linkage_matrix, index):
                     matrix[i, j] = iou(y_true==i, y_pred==j)  # matrix.shape = N x M; N true ; M pred;
             out, ind = torch.max(matrix, dim=1) # ind.shape  0 <= N[i] <= (M - 1)
             y_remap = np.zeros_like(y_pred)
-            for n, i in enumerate(range(y_true_clusters)):
-                y_remap[y_true==i] = ind[n]
-            # k_score = iou(y_true, y_pred, average='weighted')
-            k_score = out.mean()
+            for i in range(y_true_clusters):
+                y_remap[y_pred==int(ind[i])] = i + 1
+
+            y_true_cat = np.eye(y_true_clusters+1)[y_true+1]
+            y_pred_cat = np.eye(y_true_clusters+1)[y_remap]
+            k_score = (np.logical_and(y_true_cat, y_pred_cat).sum()) / (np.logical_or(y_true_cat, y_pred_cat).sum())
             if k_score > best_score:
                 best_score = k_score
                 best_k = k
