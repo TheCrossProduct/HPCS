@@ -72,10 +72,8 @@ def plot_cloud(xyz,
         plotter = pv.Plotter(title=title)
 
     poly = pv.PolyData(xyz)
-    plotter.add_mesh(poly, color=color, render_points_as_spheres=True, scalars=scalars, cmap=cmap, rgb=rgb, point_size=point_size, clim=clim)
-
-    if add_scalarbar and not rgb:
-        plotter.add_scalar_bar()
+    plotter.add_mesh(poly, color=color, render_points_as_spheres=True, scalars=scalars, cmap=cmap, rgb=rgb, point_size=point_size)
+    plotter.set_background('white')
 
     if graph is not None:
         src_g, dst_g, _ = find(graph)

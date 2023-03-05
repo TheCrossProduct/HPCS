@@ -1,21 +1,21 @@
 python train.py \
-  --dataset 'shapenet' \
-  --category 'Airplane' \
-  --level 3 \
+  --dataset 'partnet' \
+  --category 'Dishwasher' \
+  --level 1 \
   --fixed_points 1024 \
   --model 'vn_dgcnn_partseg' \
-  --eucl_embedding 32 \
-  --hyp_embedding 32 \
+  --eucl_embedding 4 \
+  --hyp_embedding 4 \
   --k 20 \
   --margin 0.35 \
   --t_per_anchor 50 \
-  --fraction 0.0 \
-  --temperature 0.00 \
+  --fraction 1.2 \
+  --temperature 0.10 \
   --epochs 40 \
-  --batch 2 \
+  --batch 1 \
   --lr 0.05 \
   --accelerator 'gpu' \
   --trade_off 0.10 \
-  --resume 'liubigli-tcp/HPCS/runs/zu8e782y' \
+  --resume 'hpcs/HPCS/runs/byr2r7pr' \
   --infer \
 #  --plot_inference
