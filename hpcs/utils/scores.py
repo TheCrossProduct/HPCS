@@ -1,3 +1,4 @@
+from typing import Union
 import numpy as np
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score, jaccard_score, confusion_matrix
 from scipy.cluster.hierarchy import fcluster
@@ -122,10 +123,19 @@ def condense_confusion_matrix(conf_mat, input_labels, condense_list):
 ############################################################################
 import torch
 
-def remap_labels(y_true):
-    y_remap = torch.zeros_like(y_true)
-    for i, l in enumerate(torch.unique(y_true)):
+def remap_labels(y_true: Union[torch.Tensor, np.ndarray]):
+    if isinstance(y_true, torch.Tensor):
+        y_remap = torch.zeros_like(y_true)
+        unique = torch.unique(y_true)
+    elif isinstance(y_true, np.ndarray):
+        y_remap = np.zeros_like(y_true)
+        unique = np.unique(y_true)
+    else:
+        raise TypeError("Only allowed type are np.ndarray or torch.Tensor")
+
+    for i, l in enumerate(unique):
         y_remap[y_true==l] = i
+
     return y_remap
 
 def get_optimal_k(y, linkage_matrix, index):
