@@ -15,6 +15,7 @@ from sklearn.metrics.cluster import adjusted_rand_score as ri
 from sklearn.manifold import TSNE
 from umap import UMAP
 from scipy.sparse import find
+from hpcs.utils.scores import remap_labels
 
 COLORS = np.array(['#377eb8', '#ff7f00', '#4daf4a', '#a65628', '#f781bf', '#984ea3', '#999999', '#e41a1c', '#000000',
                    '#dede00', '#116881', '#101a79', '#da55ba', '#5ac18e', '#6E33FF', '#33E6FF', '#B4F83D', '#1024B3',
@@ -282,8 +283,7 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, 
     """
     Auxiliary functions to plot results about hyperbolic clustering
     """
-    plt.style.use('ggplot')
-
+    pv.set_plot_theme('document')
     if isinstance(x, torch.Tensor):
         pts = x.cpu().detach().numpy()
     else:
@@ -293,6 +293,8 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, 
         y_true = y.cpu().detach().numpy()
     else:
         y_true = y
+
+    y_true = remap_labels(y_true)
 
     n_clusters = y.max() + 1
 
@@ -316,7 +318,7 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, 
     plotter.add_text('Ground Truth')
     data = pv.PolyData(pts)
     cmap_true = list(COLORS[np.unique(y_true) % len(COLORS)])
-    plotter.add_mesh(data, scalars=y_true, render_points_as_spheres=True, point_size=5.0, cmap=cmap_true, scalar_bar_args={'title': 'GT Classes'})
+    plotter.add_mesh(data, scalars=y_true, render_points_as_spheres=True, point_size=15.0, cmap=cmap_true, scalar_bar_args={'title': 'GT Classes'})
     plotter.camera_position = 'xy'
 
     idx += 1
@@ -327,7 +329,7 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, 
     plotter.add_text(f'Pred: Score@{k}: {score:.3f}')
     data = pv.PolyData(pts)
     cmap_pred = list(COLORS[np.unique(y_pred) % len(COLORS)])
-    plotter.add_mesh(data, scalars=y_pred, cmap=cmap_pred, render_points_as_spheres=True, point_size=5.0, scalar_bar_args={'title': 'Pred Classes'})
+    plotter.add_mesh(data, scalars=y_pred, cmap=cmap_pred, render_points_as_spheres=True, point_size=15.0, scalar_bar_args={'title': 'Pred Classes'})
     plotter.camera_position = 'xy'
     idx += 1
     plotter.subplot(0, 2)
@@ -336,7 +338,6 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, 
     ax.set_title('TSNE Embedding')
 
     chart = pv.ChartMPL(f)
-    chart.background_color = '#E5E5E5'
     plotter.add_chart(chart)
 
     idx += 1
@@ -349,7 +350,6 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, 
     ax.axis('equal')
     ax.set_title('UMAP Poincaré Ball')
     chart = pv.ChartMPL(f)
-    chart.background_color = '#E5E5E5'
     plotter.add_chart(chart)
 
 
