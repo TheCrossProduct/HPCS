@@ -83,7 +83,7 @@ def configure_feature_extractor(model_name, num_class, out_features, num_categor
                 new_state_dict[name] = value
         else:
             print("LOADING PRETRAINED MODEL FROM: 'checkpoints/shapenet/best_model.pth'")
-            checkpoint = torch.load('checkpoints/shapenet/best_model.pth')
+            checkpoint = torch.load('checkpoints/vndgcnn_backbone/best_model.pth')
             new_state_dict = checkpoint['model_state_dict']
             if out_features != num_class:
                 new_state_dict['conv11.0.weight'] = nn.conv11[0].weight
