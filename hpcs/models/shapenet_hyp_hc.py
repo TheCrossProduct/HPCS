@@ -28,7 +28,8 @@ class ShapeNetHypHC(BaseSimilarityHypHC):
                  plot_inference: bool = False,
                  train_rotation: str = 'so3',
                  test_rotation: str = 'so3',
-                 class_vector: bool = False):
+                 class_vector: bool = False,
+                 notebook: bool = False):
         super(ShapeNetHypHC, self).__init__(nn_feat=nn_feat,
                                             nn_emb=nn_emb,
                                             euclidean_size=euclidean_size,
@@ -44,7 +45,8 @@ class ShapeNetHypHC(BaseSimilarityHypHC):
                                             trade_off=trade_off,
                                             miner=miner,
                                             cosface=cosface,
-                                            plot_inference=plot_inference)
+                                            plot_inference=plot_inference,
+                                            notebook=notebook)
         self.num_categories = 16
         self.train_rotation = train_rotation
         self.test_rotation = test_rotation

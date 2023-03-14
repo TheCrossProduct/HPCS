@@ -29,7 +29,8 @@ class PartNetHypHC(BaseSimilarityHypHC):
                  plot_inference: bool = False,
                  train_rotation: str = 'so3',
                  test_rotation: str = 'so3',
-                 class_vector: bool = False):
+                 class_vector: bool = False,
+                 notebook: bool = False):
         super(PartNetHypHC, self).__init__(nn_feat=nn_feat,
                                            nn_emb=nn_emb,
                                            euclidean_size=euclidean_size,
@@ -45,7 +46,8 @@ class PartNetHypHC(BaseSimilarityHypHC):
                                            trade_off=trade_off,
                                            miner=miner,
                                            cosface=cosface,
-                                           plot_inference=plot_inference)
+                                           plot_inference=plot_inference,
+                                           notebook=notebook)
 
         self.train_rotation = train_rotation
         self.test_rotation = test_rotation
@@ -63,6 +65,9 @@ class PartNetHypHC(BaseSimilarityHypHC):
                                                                     embedding_size=self.euclidean_size,
                                                                     miner=self.miner,
                                                                     hierarchy_list=self.hierarchy_list)
+
+    def set_level(self, level):
+        self.level = level
 
     def _forward(self, batch, testing):
         points, targets = batch

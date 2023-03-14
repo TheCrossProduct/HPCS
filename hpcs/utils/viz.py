@@ -1,3 +1,4 @@
+from typing import Union
 import itertools
 import numpy as np
 import pyvista as pv
@@ -11,6 +12,7 @@ from matplotlib.collections import LineCollection
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.cluster.hierarchy import dendrogram, fcluster, set_link_color_palette
 from sklearn.metrics.cluster import adjusted_rand_score as ri
+from PIL import Image
 
 from sklearn.manifold import TSNE
 from umap import UMAP
@@ -279,7 +281,8 @@ def plot_graph(x, edge_index, edge_col):
     ax.scatter(xout[:, 0], xout[:, 1], s=20, c='w', edgecolors='k')
 
 
-def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, y_pred=None, k=-1, show=True):
+def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, y_pred=None, k=-1,
+                         show=True, notebook: bool = False, screenshot: Union[bool ,str] = False):
     """
     Auxiliary functions to plot results about hyperbolic clustering
     """
@@ -306,14 +309,10 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, 
 
     n_plots = 5
 
-    # plotter = BackgroundPlotter(title='Prediction')
     plotter = pv.Plotter(title='Prediction', shape=(1, 5), window_size=(2000, 400))
 
     idx = 1
-    # fig = plt.figure(figsize=(5 * n_plots, 5))
-    # ax = plt.subplot(1, n_plots, idx)
-    # plot_clustering(x, y)
-    # ax.set_title('Ground Truth')
+
     plotter.subplot(0, 0)
     plotter.add_text('Ground Truth')
     data = pv.PolyData(pts)
@@ -322,9 +321,7 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, 
     plotter.camera_position = 'xy'
 
     idx += 1
-    # ax = plt.subplot(1, n_plots, idx)
-    # plot_clustering(x, y_pred)
-    # ax.set_title(f'Pred: Score@{k}: {score:.3f}')
+
     plotter.subplot(0, 1)
     plotter.add_text(f'Pred: Score@{k}: {score:.3f}')
     data = pv.PolyData(pts)
@@ -359,13 +356,18 @@ def plot_hyperbolic_eval(x, y, emb_hidden, emb_poincare, linkage_matrix, score, 
     plot_dendrogram(linkage_matrix, n_clusters=k)
     ax.set_title(f'Dendrogram {k}-clusters')
     chart = pv.ChartMPL(f)
-    chart.background_color = 'w'
     plotter.add_chart(chart)
 
     plotter.show_axes_all()
 
     if show:
-        plotter.show()
+        if notebook:
+            plotter.show(jupyter_backend='client', screenshot=True)
+        else:
+            plotter.show()
+    if screenshot:
+        im = Image.fromarray(plotter.image)
+        im.save(screenshot)
     else:
         return plotter
 

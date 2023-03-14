@@ -1,3 +1,4 @@
+import os
 from typing import Optional
 
 import torch
@@ -37,7 +38,8 @@ class BaseSimilarityHypHC(pl.LightningModule):
                  trade_off: float = 0.1,
                  miner: bool = True,
                  cosface: bool = True,
-                 plot_inference: bool = True):
+                 plot_inference: bool = True,
+                 notebook: bool = False):
 
         super(BaseSimilarityHypHC, self).__init__()
         self.nn_feat = nn_feat
@@ -56,7 +58,7 @@ class BaseSimilarityHypHC(pl.LightningModule):
         self.miner = miner
         self.cosface = cosface
         self.plot_inference = plot_inference
-
+        self.notebook = notebook
         self.scale = torch.nn.Parameter(torch.Tensor([1e-3]), requires_grad=True)
 
         self.metric_hyp_loss = MetricHyperbolicLoss(margin=self.margin,
@@ -73,6 +75,8 @@ class BaseSimilarityHypHC(pl.LightningModule):
         self.iou = MulticlassJaccardIndex(num_classes=self.num_class)
         self.save_hyperparameters()
 
+    def set_category(self, category):
+        self.category = category
 
     def _decode_linkage(self, leaves_embeddings):
         """Build linkage matrix from leaves' embeddings. Assume points are normalized to same radius."""
@@ -195,6 +199,26 @@ class BaseSimilarityHypHC(pl.LightningModule):
             indexes.append(best_score)
             if self.plot_inference:
                 emb_poincare = self.metric_hyp_loss.normalize_embeddings(x_poincare[object_idx])
+                if self.notebook:
+                    if 'shapenet' in str(type(self)):
+                        dataset_name = 'shapenet'
+                    elif 'partnet' in str(type(self)):
+                        dataset_name = 'partnet'
+                    else:
+                        dataset_name = 'base'
+
+                    category = self.category if hasattr(self, 'category') else ''
+                    level = self.level if hasattr(self, 'level') else ''
+
+                    screenshot_basedir = os.path.join(os.getcwd(), dataset_name, category, level)
+
+                    if not os.path.exists(screenshot_basedir):
+                        os.mkdir(screenshot_basedir)
+                    idx = batch[0].shape[0] * batch_idx + object_idx
+
+                    screenshot = os.path.join(screenshot_basedir, str(idx)+'.png')
+                else:
+                    screenshot = False
                 plot_hyperbolic_eval(x=points[object_idx].T.cpu(),
                                      y=targets[object_idx].cpu(),
                                      y_pred=best_pred,
@@ -203,7 +227,9 @@ class BaseSimilarityHypHC(pl.LightningModule):
                                      linkage_matrix=linkage_matrix[object_idx],
                                      k=best_k,
                                      score=best_score,
-                                     show=True)
+                                     show=True,
+                                     notebook=self.notebook,
+                                     screenshot=screenshot)
 
         score = torch.mean(torch.tensor(indexes))
 
