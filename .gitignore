@@ -2,6 +2,9 @@ data/**
 logs/**
 wandb/**
 notebooks/*.yaml
+notebooks/*.ckpt
+notebooks/partnet
+notebooks/shapenet
 # Default ignored files
 /shelf/
 /workspace.xml
