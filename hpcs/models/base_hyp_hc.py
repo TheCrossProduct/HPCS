@@ -208,12 +208,12 @@ class BaseSimilarityHypHC(pl.LightningModule):
                         dataset_name = 'base'
 
                     category = self.category if hasattr(self, 'category') else ''
-                    level = self.level if hasattr(self, 'level') else ''
+                    level = 'level_' + str(self.level) if hasattr(self, 'level') else ''
 
                     screenshot_basedir = os.path.join(os.getcwd(), dataset_name, category, level)
 
                     if not os.path.exists(screenshot_basedir):
-                        os.mkdir(screenshot_basedir)
+                        os.makedirs(screenshot_basedir, exist_ok=True)
                     idx = batch[0].shape[0] * batch_idx + object_idx
 
                     screenshot = os.path.join(screenshot_basedir, str(idx)+'.png')
