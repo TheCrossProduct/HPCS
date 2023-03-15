@@ -12,10 +12,11 @@ class PartNetDataset(Dataset):
         labels_seg = []
         folder = os.path.dirname(filelist)
         for line in open(filelist):
-            data = h5py.File(os.path.join(folder, line.strip()))
+            data = h5py.File(os.path.join(folder, line.strip()), 'r')
             points.append(data['data'][...].astype(np.float32))
             point_nums.append(data['data_num'][...].astype(np.int32))
             labels_seg.append(data['label_seg'][...].astype(np.int64))
+            data.close() # closing file to avoid corruption
         points = np.concatenate(points, axis=0)
         point_nums = np.concatenate(point_nums, axis=0)
         labels_seg = np.concatenate(labels_seg, axis=0)
