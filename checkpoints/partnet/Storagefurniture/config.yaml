@@ -1,0 +1,158 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    cli_version: 0.13.2
+    framework: lightning
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    python_version: 3.10.4
+    start_time: 1677142767.635157
+    t:
+      1:
+      - 1
+      - 2
+      - 3
+      - 5
+      - 9
+      - 41
+      - 53
+      - 55
+      2:
+      - 1
+      - 2
+      - 3
+      - 5
+      - 9
+      - 41
+      - 53
+      - 55
+      3:
+      - 3
+      - 16
+      - 23
+      4: 3.10.4
+      5: 0.13.2
+      8:
+      - 5
+accelerator:
+  desc: null
+  value: gpu
+anneal_factor:
+  desc: null
+  value: 2
+anneal_step:
+  desc: null
+  value: 0
+batch:
+  desc: null
+  value: 8
+category:
+  desc: null
+  value: StorageFurniture
+class_vector:
+  desc: null
+  value: false
+cosface:
+  desc: null
+  value: true
+dataset:
+  desc: null
+  value: partnet
+dropout:
+  desc: null
+  value: 0.5
+epochs:
+  desc: null
+  value: 40
+eucl_embedding:
+  desc: null
+  value: 4
+euclidean_size:
+  desc: null
+  value: 4
+fixed_points:
+  desc: null
+  value: 1024
+fraction:
+  desc: null
+  value: 1.2
+hierarchical:
+  desc: null
+  value: false
+hierarchy_list:
+  desc: null
+  value: []
+hyp_embedding:
+  desc: null
+  value: 4
+hyp_size:
+  desc: null
+  value: 4
+k:
+  desc: null
+  value: 20
+level:
+  desc: null
+  value: 3
+log:
+  desc: null
+  value: logs
+lr:
+  desc: null
+  value: 0.05
+margin:
+  desc: null
+  value: 0.35
+miner:
+  desc: null
+  value: true
+model:
+  desc: null
+  value: vn_dgcnn_partseg
+nn_emb:
+  desc: null
+  value: null
+nn_feat:
+  desc: null
+  value: null
+num_class:
+  desc: null
+  value: 24
+num_workers:
+  desc: null
+  value: 10
+patience:
+  desc: null
+  value: 50
+plot_inference:
+  desc: null
+  value: false
+pretrained:
+  desc: null
+  value: false
+resume:
+  desc: null
+  value: false
+t_per_anchor:
+  desc: null
+  value: 50
+temperature:
+  desc: null
+  value: 0.1
+test_rotation:
+  desc: null
+  value: so3
+trade_off:
+  desc: null
+  value: 0.1
+train_rotation:
+  desc: null
+  value: so3
+triplet_sim:
+  desc: null
+  value: false
+wandb:
+  desc: null
+  value: online
