@@ -11,7 +11,7 @@ conda env create -f hpcs-env.yaml
 ```
 ## Fetch Data
 ### ShapeNet
-Before training/testing models you need to download ShapeNet dataset from  [TODO: Add a link to shapenet].
+Before training/testing models you need to download ShapeNet dataset from  [HERE](https://shapenet.cs.stanford.edu/media/shapenetcore_partanno_segmentation_benchmark_v0_normal.zip).
 
 Please use the following structure to organize data
 ```
@@ -26,18 +26,14 @@ Please use the following structure to organize data
 ```
 
 ### PartNet
-Similarly, download PartNet data from the following link [TODO: Add link]
+Similarly, download PartNet data from [HERE](http://download.cs.stanford.edu/orion/partnet_dataset/sem_seg_h5.zip)
 and use the following structure for PartNet data
 ```
     HPCS/
         ...
         data/
             PartNet/
-                after_merging_label_ids/
-                ins_seg_h5/
-                mergin_hierarchy_mapping/
                 sem_seg_h5/
-                train_val_test_split/
             ...
         ...
 ```
@@ -105,28 +101,14 @@ python train.py --dataset 'partnet' \
   --trade_off 0.10
 ```
 ## Test
-```
-bash run_test_shapenet.sh
-```
-or
-```
-python train.py --dataset 'shapenet' \
-  --fixed_points 1024 \
-  --model 'vn_dgcnn_partseg' \
-  --eucl_embedding 32 \
-  --hyp_embedding 32 \
-  --k 20 \
-  --margin 0.35 \
-  --t_per_anchor 50 \
-  --temperature 0.05 \
-  --epochs 50 \
-  --lr 0.05 \
-  --accelerator 'gpu' \
-  --trade_off 0.10
-```
-## Test on ShapeNet
 
-## Test on Partnet
+### Test on ShapeNet
+To infer on Shapenet data using the pretrained model, please
+```
+python infer.py shapenet --model_path checkpoints/shapenet/model.ckpt --test_batches 10 --plot
+```
+Please remove the flag ```--plot``` to avoid visualization of results.
+### Test on Partnet
 To test on partnet, please choose one between the following categories:
 - Bed
 - Bottle
@@ -146,25 +128,7 @@ To test on partnet, please choose one between the following categories:
 - TrashCan
 - Vase
 
-And choose between ``level`` from 1 to 3. 
+And choose between ``level`` from 1 to 3. For example to test on ```2``` examples from  ```category=Bottle``` at  ```level=3```, please run
 ```
-bash run_test_partnet.sh
-```
-or
-```
-python train.py --dataset 'partnet' \
-  --fixed_points 1024 \
-  --category 'Bed' \
-  --level 3 \
-  --model 'vn_dgcnn_partseg' \
-  --eucl_embedding 32 \
-  --hyp_embedding 32 \
-  --k 20 \
-  --margin 0.35 \
-  --t_per_anchor 50 \
-  --temperature 0.05 \
-  --epochs 50 \
-  --lr 0.05 \
-  --accelerator 'gpu' \
-  --trade_off 0.10
+python infer.py partnet --model_path checkpoints/partnet/Bottle/model.ckpt --level 3 --category bottle --test_batches 2 --plot
 ```
